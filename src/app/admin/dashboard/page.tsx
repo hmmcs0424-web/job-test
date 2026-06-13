@@ -22,42 +22,60 @@ function AnimatedNumber({ value, suffix = '' }: { value: number; suffix?: string
 }
 
 /* ── 세로 막대 차트 ── */
+const BAR_COLORS = ['#3b82f6','#10b981','#8b5cf6','#f59e0b','#ec4899','#14b8a6','#f97316','#6366f1'];
+
 function VBarChart({
   labels,
   datasets,
   barHeight = 160,
+  barWidthPct = 60,   // 단일 데이터셋: 막대 폭 (%)
+  groupGap = 4,       // 그룹 내 막대 간격(px)
+  colorPerBar = false, // 단일 데이터셋에서 막대마다 다른 색
 }: {
   labels: string[];
   datasets: { label: string; data: number[]; color: string }[];
   barHeight?: number;
+  barWidthPct?: number;
+  groupGap?: number;
+  colorPerBar?: boolean;
 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setTimeout(() => setMounted(true), 200); }, []);
+  const innerH = barHeight - 28;
   const maxVal = Math.max(...datasets.flatMap(d => d.data), 1);
+  const isSingle = datasets.length === 1;
 
   return (
     <div>
-      <div style={{ height: barHeight }} className="flex items-end gap-1.5">
+      <div style={{ height: barHeight }} className="flex items-end">
         {labels.map((label, i) => (
-          <div key={i} className="flex-1 flex items-end justify-center gap-0.5 h-full">
-            {datasets.map((ds, di) => {
-              const pct = ds.data[i] / maxVal;
-              const h = mounted ? Math.max(Math.round(pct * (barHeight - 24)), 3) : 0;
-              return (
-                <div key={di} className="flex-1 flex flex-col items-center justify-end h-full">
-                  {mounted && <span className="text-xs font-bold mb-0.5 leading-none" style={{ color: ds.color }}>{ds.data[i]}</span>}
-                  <div className="w-full rounded-t-md transition-all duration-700 ease-out"
-                    style={{ height: h, background: ds.color, transitionDelay: `${i * 60}ms` }} />
-                </div>
-              );
-            })}
+          <div key={i} className="flex-1 flex flex-col items-center justify-end h-full px-1">
+            <div className="flex items-end justify-center w-full" style={{ gap: groupGap, height: innerH }}>
+              {datasets.map((ds, di) => {
+                const barColor = colorPerBar && isSingle ? BAR_COLORS[i % BAR_COLORS.length] : ds.color;
+                const pct = ds.data[i] / maxVal;
+                const h = mounted ? Math.max(Math.round(pct * innerH), 3) : 0;
+                return (
+                  <div key={di} className="flex flex-col items-center justify-end"
+                    style={{ width: isSingle ? `${barWidthPct}%` : `calc(50% - ${groupGap / 2}px)`, height: '100%' }}>
+                    {mounted && (
+                      <span className="text-xs font-bold mb-1 leading-none" style={{ color: barColor }}>
+                        {ds.data[i]}
+                      </span>
+                    )}
+                    <div className="w-full rounded-t-md transition-all duration-700 ease-out"
+                      style={{ height: h, background: barColor, transitionDelay: `${i * 50}ms` }} />
+                  </div>
+                );
+              })}
+            </div>
           </div>
         ))}
       </div>
-      <div className="flex gap-1.5 mt-2 pt-2 border-t border-gray-100">
+      <div className="flex mt-2 pt-2 border-t border-gray-100">
         {labels.map((label, i) => (
-          <div key={i} className="flex-1 text-center text-xs text-gray-500 leading-tight overflow-hidden">
-            <span className="block truncate">{label}</span>
+          <div key={i} className="flex-1 text-center text-xs text-gray-500 leading-tight px-0.5">
+            <span className="block" style={{ wordBreak: 'keep-all', lineHeight: '1.3' }}>{label}</span>
           </div>
         ))}
       </div>
@@ -320,6 +338,8 @@ export default function AdminDashboard() {
               labels={activePartStats.map(ps => ps.part.name)}
               datasets={[{ label: '평균', data: activePartStats.map(ps => ps.avg), color: '#10b981' }]}
               barHeight={170}
+              barWidthPct={50}
+              colorPerBar
             />
           )}
         </div>
@@ -427,7 +447,8 @@ export default function AdminDashboard() {
                       { label: selectedExam?.title ?? '현재', data: cmpStats.map(ps => ps.avg), color: '#3b82f6' },
                       { label: compareExam?.title ?? '이전', data: cmpStats.map(ps => ps.cAvg), color: '#f59e0b' },
                     ]}
-                    barHeight={220}
+                    barHeight={240}
+                    groupGap={6}
                   />
                 </div>
               );
@@ -469,7 +490,6 @@ export default function AdminDashboard() {
                   <th className="pb-3 font-semibold">사번</th>
                   <th className="pb-3 font-semibold">파트</th>
                   <th className="pb-3 font-semibold">점수</th>
-                  <th className="pb-3 font-semibold">결과</th>
                   <th className="pb-3 font-semibold">제출 시간</th>
                 </tr>
               </thead>
@@ -480,51 +500,34 @@ export default function AdminDashboard() {
                     <td className="py-3 text-gray-400">{r.staffEmployeeId}</td>
                     <td className="py-3 text-gray-500">{parts.find(p => p.id === r.partId)?.name ?? '-'}</td>
                     <td className="py-3 font-medium">{r.totalScore}<span className="text-gray-300">/{r.maxScore}</span></td>
-                    <td className="py-3">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${r.passed ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
-                        {r.passed ? '✓ 합격' : '✗ 불합격'}
-                      </span>
-                    </td>
                     <td className="py-3 text-gray-400 text-xs">{new Date(r.submittedAt).toLocaleString('ko-KR')}</td>
                   </tr>
                 ))}
                 {results.length === 0 && (
-                  <tr><td colSpan={6} className="py-12 text-center text-gray-300">응시 결과가 없습니다.</td></tr>
+                  <tr><td colSpan={5} className="py-12 text-center text-gray-300">응시 결과가 없습니다.</td></tr>
                 )}
               </tbody>
             </table>
           )}
 
           {detailTab === 'part' && (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {activePartStats.length === 0 && (
                 <p className="text-center text-gray-400 py-8">파트별 데이터가 없습니다.</p>
               )}
-              {activePartStats.map((ps, i) => {
-                const rate = ps.count > 0 ? Math.round(ps.passCount / ps.count * 100) : 0;
-                return (
-                  <div key={ps.part.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl hover:bg-blue-50/30 transition-colors">
-                    <div className={`w-3 h-10 rounded-full ${ps.color}`} />
-                    <div className="w-28 flex-shrink-0">
-                      <p className="font-semibold text-gray-900 text-sm">{ps.part.name}</p>
-                      <p className="text-xs text-gray-400">{ps.count}명 응시</p>
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex justify-between text-xs mb-1">
-                        <span className="text-gray-500">합격률</span>
-                        <span className="font-bold text-gray-700">{rate}%</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                        <div className={`h-2 rounded-full ${ps.color} transition-all duration-700`} style={{ width: `${rate}%` }} />
-                      </div>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-2xl font-black text-gray-900">{ps.avg}<span className="text-sm font-normal text-gray-400">점</span></p>
-                      <p className="text-xs text-gray-400">평균</p>
-                    </div>
+              {activePartStats.map((ps) => (
+                <div key={ps.part.id} className="flex items-center gap-4 px-4 py-3 bg-gray-50 rounded-xl hover:bg-blue-50/30 transition-colors">
+                  <div className={`w-2.5 h-8 rounded-full flex-shrink-0 ${ps.color}`} />
+                  <div className="flex-1">
+                    <p className="font-semibold text-gray-900 text-sm">{ps.part.name}</p>
+                    <p className="text-xs text-gray-400">{ps.count}명 응시</p>
                   </div>
-                );
-              })}
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-2xl font-black text-gray-900">{ps.avg}<span className="text-sm font-normal text-gray-400">점</span></p>
+                    <p className="text-xs text-gray-400">평균</p>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 
@@ -534,7 +537,6 @@ export default function AdminDashboard() {
                 <tr className="text-gray-400 text-left text-xs uppercase tracking-wide">
                   <th className="pb-3 font-semibold">이름</th>
                   <th className="pb-3 font-semibold">파트</th>
-                  <th className="pb-3 font-semibold">응시 횟수</th>
                   <th className="pb-3 font-semibold">최근 점수</th>
                   <th className="pb-3 font-semibold">평균 점수</th>
                 </tr>
@@ -549,11 +551,10 @@ export default function AdminDashboard() {
                     <tr key={s.id} className="hover:bg-blue-50/30 transition-colors">
                       <td className="py-3 font-semibold text-gray-900">{s.name}</td>
                       <td className="py-3 text-gray-500">{parts.find(p => p.id === s.partId)?.name ?? '-'}</td>
-                      <td className="py-3"><span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-bold">{sr.length}회</span></td>
                       <td className="py-3 font-medium">{latest.totalScore}<span className="text-gray-300">/{latest.maxScore}</span></td>
                       <td className="py-3">
                         <div className="flex items-center gap-2">
-                          <div className="w-16 bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                          <div className="w-20 bg-gray-100 rounded-full h-1.5 overflow-hidden">
                             <div className="bg-violet-500 h-1.5 rounded-full" style={{ width: `${avg}%` }} />
                           </div>
                           <span className="font-bold text-gray-700">{avg}점</span>
