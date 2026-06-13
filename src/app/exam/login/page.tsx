@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getNonDraftExams, findStaff, getParts, getAdminConfig } from '@/lib/firestore';
+import { getActiveExams, findStaff, getParts, getAdminConfig } from '@/lib/firestore';
 import { saveStaffSession } from '@/lib/session';
 import type { Exam, Part } from '@/lib/types';
 
@@ -18,7 +18,7 @@ export default function ExamLogin() {
   const [loggingIn, setLoggingIn] = useState(false);
 
   useEffect(() => {
-    Promise.all([getNonDraftExams(), getParts(), getAdminConfig()]).then(([exs, pts, cfg]) => {
+    Promise.all([getActiveExams(), getParts(), getAdminConfig()]).then(([exs, pts, cfg]) => {
       setExams(exs);
       setParts(pts);
       if (cfg?.defaultExamId && exs.some((e: Exam) => e.id === cfg.defaultExamId)) {
