@@ -103,6 +103,15 @@ export async function getActiveExams(): Promise<Exam[]> {
   return docs.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+// draft 제외한 모든 시험 (상담사 로그인 목록용)
+export async function getNonDraftExams(): Promise<Exam[]> {
+  const snap = await getDocs(collection(db, 'exams'));
+  const docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Exam));
+  return docs
+    .filter(e => e.status !== 'draft')
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
 // Questions
 export async function getQuestions(examId: string): Promise<Question[]> {
   const snap = await getDocs(
