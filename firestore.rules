@@ -1,0 +1,9 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 모든 읽기/쓰기 허용 (인증은 앱 레벨에서 관리)
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
