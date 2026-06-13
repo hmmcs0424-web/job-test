@@ -115,16 +115,12 @@ export default function AdminDashboard() {
   const compareResults = compareExamId ? allResults.filter(r => r.examId === compareExamId) : [];
 
   const totalCount = results.length;
-  const passCount = results.filter(r => r.passed).length;
-  const passRate = totalCount > 0 ? Math.round(passCount / totalCount * 100) : 0;
   const avgScore = totalCount > 0
     ? Math.round(results.reduce((s, r) => s + (r.maxScore > 0 ? (r.totalScore / r.maxScore) * 100 : 0), 0) / totalCount)
     : 0;
 
   /* 비교 시험 통계 */
   const cTotal = compareResults.length;
-  const cPass = compareResults.filter(r => r.passed).length;
-  const cPassRate = cTotal > 0 ? Math.round(cPass / cTotal * 100) : 0;
   const cAvgScore = cTotal > 0
     ? Math.round(compareResults.reduce((s, r) => s + (r.maxScore > 0 ? (r.totalScore / r.maxScore) * 100 : 0), 0) / cTotal)
     : 0;
@@ -143,10 +139,9 @@ export default function AdminDashboard() {
     const cAvg = cpr.length > 0
       ? Math.round(cpr.reduce((s, r) => s + (r.maxScore > 0 ? (r.totalScore / r.maxScore) * 100 : 0), 0) / cpr.length)
       : 0;
-    return { part: p, count: pr.length, passCount: pr.filter(r => r.passed).length, avg, cAvg, color: PART_COLORS[i % PART_COLORS.length] };
+    return { part: p, count: pr.length, avg, cAvg, color: PART_COLORS[i % PART_COLORS.length] };
   });
   const activePartStats = partStats.filter(ps => ps.count > 0);
-  const maxAvg = Math.max(...activePartStats.map(ps => Math.max(ps.avg, ps.cAvg)), 100);
 
   if (loading) return (
     <div className="flex items-center justify-center h-full min-h-screen">
@@ -366,8 +361,8 @@ export default function AdminDashboard() {
           {/* 비교 시험 선택 */}
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-blue-500" />
-              <span className="text-xs text-gray-500">{selectedExam?.title ?? '현재 시험'}</span>
+              <span className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" />
+              <span className="text-xs text-gray-600 font-medium">{selectedExam?.title ?? '현재 시험'}</span>
             </div>
             <span className="text-gray-300">vs</span>
             <div className="flex items-center gap-2">
@@ -390,12 +385,11 @@ export default function AdminDashboard() {
           </div>
         ) : (
           <div className="space-y-6">
-            {/* 전체 비교 지표 */}
-            <div className="grid grid-cols-3 gap-4">
+            {/* 전체 비교 지표 — 응시인원 / 평균점수 */}
+            <div className="grid grid-cols-2 gap-4">
               {[
                 { label: '응시 인원', cur: totalCount, prev: cTotal, unit: '명', color: 'text-blue-600' },
                 { label: '평균 점수', cur: avgScore, prev: cAvgScore, unit: '점', color: 'text-violet-600' },
-                { label: '합격률', cur: passRate, prev: cPassRate, unit: '%', color: 'text-emerald-600' },
               ].map(item => {
                 const diff = item.cur - item.prev;
                 return (
@@ -403,7 +397,7 @@ export default function AdminDashboard() {
                     <p className="text-xs text-gray-500 mb-2">{item.label}</p>
                     <div className="flex items-center justify-center gap-3">
                       <div>
-                        <p className="text-xs text-orange-400 font-medium mb-0.5">{compareExam?.title.slice(0, 8)}...</p>
+                        <p className="text-xs text-orange-400 font-medium mb-0.5 truncate max-w-[120px]">{compareExam?.title}</p>
                         <p className="text-xl font-bold text-gray-400">{item.prev}{item.unit}</p>
                       </div>
                       <div className={`flex flex-col items-center ${diff > 0 ? 'text-emerald-500' : diff < 0 ? 'text-red-400' : 'text-gray-400'}`}>
@@ -411,7 +405,7 @@ export default function AdminDashboard() {
                         <span className="text-xs font-bold">{diff > 0 ? '+' : ''}{diff}{item.unit}</span>
                       </div>
                       <div>
-                        <p className="text-xs text-blue-500 font-medium mb-0.5">{selectedExam?.title.slice(0, 8)}...</p>
+                        <p className="text-xs text-blue-500 font-medium mb-0.5 truncate max-w-[120px]">{selectedExam?.title}</p>
                         <p className={`text-xl font-bold ${item.color}`}>{item.cur}{item.unit}</p>
                       </div>
                     </div>
@@ -428,16 +422,16 @@ export default function AdminDashboard() {
               }
               return (
                 <div>
-                  <div className="flex items-center gap-4 mb-4">
+                  <div className="flex items-center gap-6 mb-4 flex-wrap">
                     <p className="text-sm font-bold text-gray-700">파트별 비교</p>
-                    <div className="flex items-center gap-4 text-xs text-gray-500">
+                    <div className="flex items-center gap-5 text-xs text-gray-600">
                       <span className="flex items-center gap-1.5">
-                        <span className="w-3 h-3 rounded-sm inline-block" style={{ background: '#3b82f6' }} />
-                        {selectedExam?.title.slice(0, 12)}
+                        <span className="w-3 h-3 rounded-sm inline-block flex-shrink-0" style={{ background: '#3b82f6' }} />
+                        {selectedExam?.title}
                       </span>
                       <span className="flex items-center gap-1.5">
-                        <span className="w-3 h-3 rounded-sm inline-block" style={{ background: '#f59e0b' }} />
-                        {compareExam?.title.slice(0, 12)}
+                        <span className="w-3 h-3 rounded-sm inline-block flex-shrink-0" style={{ background: '#f59e0b' }} />
+                        {compareExam?.title}
                       </span>
                     </div>
                   </div>
@@ -448,7 +442,8 @@ export default function AdminDashboard() {
                       { label: compareExam?.title ?? '이전', data: cmpStats.map(ps => ps.cAvg), color: '#f59e0b' },
                     ]}
                     barHeight={240}
-                    groupGap={6}
+                    barWidthPct={35}
+                    groupGap={8}
                   />
                 </div>
               );
