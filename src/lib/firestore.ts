@@ -97,9 +97,10 @@ export async function deleteExam(id: string) {
 
 export async function getActiveExams(): Promise<Exam[]> {
   const snap = await getDocs(
-    query(collection(db, 'exams'), where('status', '==', 'active'), orderBy('createdAt', 'desc'))
+    query(collection(db, 'exams'), where('status', '==', 'active'))
   );
-  return snap.docs.map(d => ({ id: d.id, ...d.data() } as Exam));
+  const docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Exam));
+  return docs.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 // Questions

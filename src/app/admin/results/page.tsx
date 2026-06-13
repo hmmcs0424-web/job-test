@@ -100,12 +100,9 @@ export default function AdminResults() {
             <p className="text-gray-500 text-sm">{selectedResult.examTitle} · {parts.find(p => p.id === selectedResult.partId)?.name}</p>
           </div>
           <div className="flex items-center gap-3">
-            <div className={`text-xl font-bold ${selectedResult.passed ? 'text-blue-600' : 'text-red-500'}`}>
+            <div className="text-xl font-bold text-blue-600">
               {selectedResult.totalScore}/{selectedResult.maxScore}점
             </div>
-            <span className={`px-3 py-1 rounded-full text-sm font-bold ${selectedResult.passed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-              {selectedResult.passed ? '합격' : '불합격'}
-            </span>
             {!editMode && (
               <button onClick={() => {
                 const init: Record<string, string> = {};
@@ -228,7 +225,6 @@ export default function AdminResults() {
               <th className="text-left px-5 py-3 font-medium text-gray-500">파트</th>
               <th className="text-left px-5 py-3 font-medium text-gray-500">시험</th>
               <th className="text-left px-5 py-3 font-medium text-gray-500">점수</th>
-              <th className="text-left px-5 py-3 font-medium text-gray-500">결과</th>
               <th className="text-left px-5 py-3 font-medium text-gray-500">수정</th>
               <th className="px-5 py-3"></th>
             </tr>
@@ -239,12 +235,7 @@ export default function AdminResults() {
                 <td className="px-5 py-3 font-medium">{r.staffName}</td>
                 <td className="px-5 py-3 text-gray-500">{parts.find(p => p.id === r.partId)?.name ?? '-'}</td>
                 <td className="px-5 py-3 text-gray-500 max-w-xs truncate">{r.examTitle}</td>
-                <td className="px-5 py-3">{r.totalScore}/{r.maxScore}</td>
-                <td className="px-5 py-3">
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${r.passed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-                    {r.passed ? '합격' : '불합격'}
-                  </span>
-                </td>
+                <td className="px-5 py-3 font-medium">{r.totalScore}/{r.maxScore}</td>
                 <td className="px-5 py-3">
                   {r.editHistory.length > 0 && (
                     <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">{r.editHistory.length}회 수정</span>
@@ -256,7 +247,7 @@ export default function AdminResults() {
               </tr>
             ))}
             {filteredResults.length === 0 && (
-              <tr><td colSpan={7} className="text-center text-gray-400 py-10">결과가 없습니다.</td></tr>
+              <tr><td colSpan={6} className="text-center text-gray-400 py-10">결과가 없습니다.</td></tr>
             )}
           </tbody>
         </table>
