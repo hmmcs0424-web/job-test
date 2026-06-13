@@ -21,64 +21,46 @@ function AnimatedNumber({ value, suffix = '' }: { value: number; suffix?: string
   return <>{display}{suffix}</>;
 }
 
-/* ── 수평 바 차트 아이템 ── */
-function HBar({
-  label, value, maxValue, color, subLabel, compareValue, compareColor,
+/* ── 세로 막대 차트 ── */
+function VBarChart({
+  labels,
+  datasets,
+  barHeight = 160,
 }: {
-  label: string; value: number; maxValue: number; color: string;
-  subLabel?: string; compareValue?: number; compareColor?: string;
+  labels: string[];
+  datasets: { label: string; data: number[]; color: string }[];
+  barHeight?: number;
 }) {
   const [mounted, setMounted] = useState(false);
-  useEffect(() => { setTimeout(() => setMounted(true), 100); }, []);
-  const pct = maxValue > 0 ? (value / maxValue) * 100 : 0;
-  const cPct = compareValue !== undefined && maxValue > 0 ? (compareValue / maxValue) * 100 : 0;
+  useEffect(() => { setTimeout(() => setMounted(true), 200); }, []);
+  const maxVal = Math.max(...datasets.flatMap(d => d.data), 1);
 
   return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between text-sm">
-        <span className="font-medium text-gray-700 truncate max-w-[140px]">{label}</span>
-        <div className="flex items-center gap-2 text-xs">
-          {compareValue !== undefined && (
-            <span className="text-gray-400">{compareValue}점</span>
-          )}
-          <span className={`font-bold ${color.includes('blue') ? 'text-blue-600' : color.includes('emerald') ? 'text-emerald-600' : color.includes('violet') ? 'text-violet-600' : 'text-orange-500'}`}>
-            {value}점
-          </span>
-        </div>
+    <div>
+      <div style={{ height: barHeight }} className="flex items-end gap-1.5">
+        {labels.map((label, i) => (
+          <div key={i} className="flex-1 flex items-end justify-center gap-0.5 h-full">
+            {datasets.map((ds, di) => {
+              const pct = ds.data[i] / maxVal;
+              const h = mounted ? Math.max(Math.round(pct * (barHeight - 24)), 3) : 0;
+              return (
+                <div key={di} className="flex-1 flex flex-col items-center justify-end h-full">
+                  {mounted && <span className="text-xs font-bold mb-0.5 leading-none" style={{ color: ds.color }}>{ds.data[i]}</span>}
+                  <div className="w-full rounded-t-md transition-all duration-700 ease-out"
+                    style={{ height: h, background: ds.color, transitionDelay: `${i * 60}ms` }} />
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </div>
-      {/* 현재 시험 바 */}
-      <div className="w-full bg-gray-100 rounded-full h-5 overflow-hidden">
-        <div className={`h-5 rounded-full transition-all duration-700 ${color}`}
-          style={{ width: mounted ? `${Math.max(pct, 2)}%` : '0%' }} />
+      <div className="flex gap-1.5 mt-2 pt-2 border-t border-gray-100">
+        {labels.map((label, i) => (
+          <div key={i} className="flex-1 text-center text-xs text-gray-500 leading-tight overflow-hidden">
+            <span className="block truncate">{label}</span>
+          </div>
+        ))}
       </div>
-      {/* 비교 시험 바 */}
-      {compareValue !== undefined && (
-        <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
-          <div className={`h-3 rounded-full transition-all duration-700 opacity-60 ${compareColor}`}
-            style={{ width: mounted ? `${Math.max(cPct, 2)}%` : '0%' }} />
-        </div>
-      )}
-      {subLabel && <p className="text-xs text-gray-400">{subLabel}</p>}
-    </div>
-  );
-}
-
-/* ── 비교 도넛 차트 (합격률) ── */
-function DonutChart({ pct, label, color }: { pct: number; label: string; color: string }) {
-  const [animated, setAnimated] = useState(0);
-  useEffect(() => { setTimeout(() => setAnimated(pct), 200); }, [pct]);
-  const r = 30; const circ = 2 * Math.PI * r;
-  const dash = (animated / 100) * circ;
-  return (
-    <div className="flex flex-col items-center gap-1">
-      <svg width="80" height="80" viewBox="0 0 80 80">
-        <circle cx="40" cy="40" r={r} fill="none" stroke="#e5e7eb" strokeWidth="8" />
-        <circle cx="40" cy="40" r={r} fill="none" stroke={color} strokeWidth="8"
-          strokeDasharray={`${dash} ${circ - dash}`} strokeDashoffset={circ / 4}
-          strokeLinecap="round" style={{ transition: 'stroke-dasharray 0.8s ease' }} />
-        <text x="40" y="44" textAnchor="middle" fontSize="13" fontWeight="bold" fill="#1f2937">{pct}%</text>
-      </svg>
-      <p className="text-xs text-gray-500">{label}</p>
     </div>
   );
 }
@@ -334,21 +316,11 @@ export default function AdminDashboard() {
           {activePartStats.length === 0 ? (
             <p className="text-gray-400 text-sm text-center py-4">파트 데이터 없음</p>
           ) : (
-            <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
-              {activePartStats.map((ps, i) => (
-                <div key={ps.part.id}>
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="font-medium text-gray-700 truncate max-w-[120px]">{ps.part.name}</span>
-                    <span className="font-bold text-gray-900">{ps.avg}점</span>
-                  </div>
-                  <div className="w-full bg-gray-100 rounded-full h-4 overflow-hidden">
-                    <div className={`h-4 rounded-full ${ps.color} transition-all duration-700`}
-                      style={{ width: mounted ? `${ps.avg}%` : '0%', transitionDelay: `${i * 80}ms` }} />
-                  </div>
-                  <p className="text-xs text-gray-400 mt-0.5">{ps.count}명 응시 · 합격 {ps.passCount}명</p>
-                </div>
-              ))}
-            </div>
+            <VBarChart
+              labels={activePartStats.map(ps => ps.part.name)}
+              datasets={[{ label: '평균', data: activePartStats.map(ps => ps.avg), color: '#10b981' }]}
+              barHeight={170}
+            />
           )}
         </div>
       </div>
@@ -428,31 +400,38 @@ export default function AdminDashboard() {
               })}
             </div>
 
-            {/* 파트별 비교 바 차트 */}
-            {activePartStats.some(ps => ps.cAvg > 0) ? (
-              <div>
-                <div className="flex items-center gap-4 mb-4">
-                  <p className="text-sm font-bold text-gray-700">파트별 비교</p>
-                  <div className="flex items-center gap-3 text-xs text-gray-400">
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-blue-500 inline-block" /> {selectedExam?.title.slice(0, 10)}</span>
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-orange-400 opacity-60 inline-block" /> {compareExam?.title.slice(0, 10)}</span>
+            {/* 파트별 비교 세로 막대 차트 */}
+            {(() => {
+              const cmpStats = partStats.filter(ps => ps.count > 0 || ps.cAvg > 0);
+              if (cmpStats.length === 0) {
+                return <p className="text-sm text-center text-gray-400 py-4">선택한 이전 시험에 파트별 데이터가 없습니다.</p>;
+              }
+              return (
+                <div>
+                  <div className="flex items-center gap-4 mb-4">
+                    <p className="text-sm font-bold text-gray-700">파트별 비교</p>
+                    <div className="flex items-center gap-4 text-xs text-gray-500">
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-3 h-3 rounded-sm inline-block" style={{ background: '#3b82f6' }} />
+                        {selectedExam?.title.slice(0, 12)}
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-3 h-3 rounded-sm inline-block" style={{ background: '#f59e0b' }} />
+                        {compareExam?.title.slice(0, 12)}
+                      </span>
+                    </div>
                   </div>
+                  <VBarChart
+                    labels={cmpStats.map(ps => ps.part.name)}
+                    datasets={[
+                      { label: selectedExam?.title ?? '현재', data: cmpStats.map(ps => ps.avg), color: '#3b82f6' },
+                      { label: compareExam?.title ?? '이전', data: cmpStats.map(ps => ps.cAvg), color: '#f59e0b' },
+                    ]}
+                    barHeight={220}
+                  />
                 </div>
-                <div className="space-y-4">
-                  {partStats.filter(ps => ps.count > 0 || ps.cAvg > 0).map((ps, i) => (
-                    <HBar key={ps.part.id}
-                      label={ps.part.name}
-                      value={ps.avg} maxValue={maxAvg} color={`bg-blue-500`}
-                      compareValue={ps.cAvg} compareColor="bg-orange-400"
-                      subLabel={`현재 ${ps.count}명 · 이전 ${compareResults.filter(r => r.partId === ps.part.id).length}명`}
-                    />
-                  ))}
-                </div>
-                <p className="text-xs text-gray-400 mt-3">위 막대: 현재 시험 &nbsp;|&nbsp; 아래 막대(옅은 색): 비교 시험</p>
-              </div>
-            ) : (
-              <p className="text-sm text-center text-gray-400 py-4">선택한 이전 시험에 파트별 데이터가 없습니다.</p>
-            )}
+              );
+            })()}
           </div>
         )}
       </div>
