@@ -28,20 +28,22 @@ function VBarChart({
   labels,
   datasets,
   barHeight = 160,
-  barWidthPct = 60,   // 단일 데이터셋: 막대 폭 (%)
-  groupGap = 4,       // 그룹 내 막대 간격(px)
-  colorPerBar = false, // 단일 데이터셋에서 막대마다 다른 색
+  barWidthPct = 60,
+  groupGap = 4,
+  partGap = 8,        // 파트 그룹 간 좌우 패딩(px)
+  colorPerBar = false,
 }: {
   labels: string[];
   datasets: { label: string; data: number[]; color: string }[];
   barHeight?: number;
   barWidthPct?: number;
   groupGap?: number;
+  partGap?: number;
   colorPerBar?: boolean;
 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setTimeout(() => setMounted(true), 200); }, []);
-  const innerH = barHeight - 28;
+  const innerH = barHeight - 32;
   const maxVal = Math.max(...datasets.flatMap(d => d.data), 1);
   const isSingle = datasets.length === 1;
 
@@ -49,7 +51,8 @@ function VBarChart({
     <div>
       <div style={{ height: barHeight }} className="flex items-end">
         {labels.map((label, i) => (
-          <div key={i} className="flex-1 flex flex-col items-center justify-end h-full px-1">
+          <div key={i} className="flex-1 flex flex-col items-center justify-end h-full"
+            style={{ paddingLeft: partGap, paddingRight: partGap }}>
             <div className="flex items-end justify-center w-full" style={{ gap: groupGap, height: innerH }}>
               {datasets.map((ds, di) => {
                 const barColor = colorPerBar && isSingle ? BAR_COLORS[i % BAR_COLORS.length] : ds.color;
@@ -74,7 +77,8 @@ function VBarChart({
       </div>
       <div className="flex mt-2 pt-2 border-t border-gray-100">
         {labels.map((label, i) => (
-          <div key={i} className="flex-1 text-center text-xs text-gray-500 leading-tight px-0.5">
+          <div key={i} className="flex-1 text-center text-xs text-gray-500 leading-tight"
+            style={{ paddingLeft: partGap, paddingRight: partGap }}>
             <span className="block" style={{ wordBreak: 'keep-all', lineHeight: '1.3' }}>{label}</span>
           </div>
         ))}
@@ -442,8 +446,9 @@ export default function AdminDashboard() {
                       { label: compareExam?.title ?? '이전', data: cmpStats.map(ps => ps.cAvg), color: '#f59e0b' },
                     ]}
                     barHeight={240}
-                    barWidthPct={35}
-                    groupGap={8}
+                    barWidthPct={40}
+                    groupGap={6}
+                    partGap={24}
                   />
                 </div>
               );
