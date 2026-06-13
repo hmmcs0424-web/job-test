@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getParts, getStaffList, addPart, updatePart, deletePart, addStaff, updateStaff, deleteStaff } from '@/lib/firestore';
+import { getParts, getStaffList, addPart, updatePart, deletePart, addStaff, updateStaff, toggleStaffActive } from '@/lib/firestore';
 import type { Part, Staff } from '@/lib/types';
 
 export default function AdminStaff() {
@@ -10,15 +10,14 @@ export default function AdminStaff() {
   const [activeTab, setActiveTab] = useState<'staff' | 'parts'>('staff');
   const [loading, setLoading] = useState(true);
 
-  // Part form
   const [partName, setPartName] = useState('');
   const [editingPart, setEditingPart] = useState<Part | null>(null);
 
-  // Staff form
   const [staffForm, setStaffForm] = useState({ name: '', employeeId: '', partId: '' });
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [filterPartId, setFilterPartId] = useState('');
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
   const [msg, setMsg] = useState('');
 
   async function reload() {
@@ -55,7 +54,7 @@ export default function AdminStaff() {
     if (editingStaff) {
       await updateStaff(editingStaff.id, staffForm);
     } else {
-      await addStaff({ ...staffForm, createdAt: new Date().toISOString() });
+      await addStaff({ ...staffForm, createdAt: new Date().toISOString(), isActive: true });
     }
     setStaffForm({ name: '', employeeId: '', partId: '' });
     setEditingStaff(null);
@@ -64,13 +63,22 @@ export default function AdminStaff() {
     setTimeout(() => setMsg(''), 2000);
   }
 
-  async function handleDeleteStaff(id: string) {
-    if (!confirm('상담사를 삭제하시겠습니까?')) return;
-    await deleteStaff(id);
+  async function handleToggleActive(s: Staff) {
+    const next = s.isActive === false ? true : false;
+    const label = next ? '활성화' : '비활성화(퇴사처리)';
+    if (!confirm(`${s.name} 상담사를 ${label}하시겠습니까?`)) return;
+    await toggleStaffActive(s.id, next);
     await reload();
   }
 
+  const isActive = (s: Staff) => s.isActive !== false;
+
   const filteredStaff = staffList
+    .filter(s => {
+      if (statusFilter === 'active') return isActive(s);
+      if (statusFilter === 'inactive') return !isActive(s);
+      return true;
+    })
     .filter(s => !filterPartId || s.partId === filterPartId)
     .filter(s => !search || s.name.includes(search) || s.employeeId.includes(search));
 
@@ -123,6 +131,7 @@ export default function AdminStaff() {
 
       {activeTab === 'staff' && (
         <div className="grid grid-cols-2 gap-6">
+          {/* 추가/수정 폼 */}
           <div>
             <div className="bg-white rounded-2xl p-5 shadow-sm mb-4">
               <h2 className="font-semibold text-gray-800 mb-3">{editingStaff ? '상담사 수정' : '상담사 추가'}</h2>
@@ -147,16 +156,42 @@ export default function AdminStaff() {
                 </div>
               </div>
             </div>
+
+            {/* 상태 통계 */}
+            <div className="bg-white rounded-2xl p-5 shadow-sm">
+              <p className="text-sm font-medium text-gray-700 mb-3">인원 현황</p>
+              <div className="grid grid-cols-3 gap-2 text-center text-sm">
+                <div className="bg-blue-50 rounded-xl p-3">
+                  <p className="text-xl font-bold text-blue-600">{staffList.filter(isActive).length}</p>
+                  <p className="text-gray-500 text-xs mt-0.5">재직</p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-3">
+                  <p className="text-xl font-bold text-gray-500">{staffList.filter(s => !isActive(s)).length}</p>
+                  <p className="text-gray-500 text-xs mt-0.5">비활성</p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-3">
+                  <p className="text-xl font-bold text-gray-700">{staffList.length}</p>
+                  <p className="text-gray-500 text-xs mt-0.5">전체</p>
+                </div>
+              </div>
+            </div>
           </div>
 
+          {/* 목록 */}
           <div>
-            <div className="flex gap-2 mb-3">
+            <div className="flex gap-2 mb-3 flex-wrap">
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="이름/사번 검색"
-                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="flex-1 min-w-[120px] border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               <select value={filterPartId} onChange={e => setFilterPartId(e.target.value)}
                 className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">전체 파트</option>
                 {parts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as typeof statusFilter)}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="active">재직 중</option>
+                <option value="inactive">비활성</option>
+                <option value="all">전체</option>
               </select>
             </div>
             <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
@@ -166,26 +201,37 @@ export default function AdminStaff() {
                     <th className="text-left px-4 py-3 font-medium text-gray-500">이름</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-500">사번</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-500">파트</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-500">상태</th>
                     <th className="px-4 py-3"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filteredStaff.map(s => (
-                    <tr key={s.id} className="hover:bg-gray-50">
+                    <tr key={s.id} className={`hover:bg-gray-50 ${!isActive(s) ? 'opacity-50' : ''}`}>
                       <td className="px-4 py-3 font-medium">{s.name}</td>
                       <td className="px-4 py-3 text-gray-500">{s.employeeId}</td>
                       <td className="px-4 py-3 text-gray-500">{parts.find(p => p.id === s.partId)?.name ?? '-'}</td>
                       <td className="px-4 py-3">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${isActive(s) ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                          {isActive(s) ? '재직' : '비활성'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
                         <div className="flex gap-2 justify-end">
-                          <button onClick={() => { setEditingStaff(s); setStaffForm({ name: s.name, employeeId: s.employeeId, partId: s.partId }); }}
+                          <button
+                            onClick={() => { setEditingStaff(s); setStaffForm({ name: s.name, employeeId: s.employeeId, partId: s.partId }); }}
                             className="text-blue-600 hover:text-blue-800 text-xs">수정</button>
-                          <button onClick={() => handleDeleteStaff(s.id)} className="text-red-500 hover:text-red-700 text-xs">삭제</button>
+                          <button
+                            onClick={() => handleToggleActive(s)}
+                            className={`text-xs ${isActive(s) ? 'text-orange-500 hover:text-orange-700' : 'text-green-600 hover:text-green-800'}`}>
+                            {isActive(s) ? '비활성화' : '활성화'}
+                          </button>
                         </div>
                       </td>
                     </tr>
                   ))}
                   {filteredStaff.length === 0 && (
-                    <tr><td colSpan={4} className="text-center text-gray-400 py-8">등록된 상담사가 없습니다.</td></tr>
+                    <tr><td colSpan={5} className="text-center text-gray-400 py-8">해당하는 상담사가 없습니다.</td></tr>
                   )}
                 </tbody>
               </table>

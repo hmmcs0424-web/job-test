@@ -11,6 +11,7 @@ export interface Staff {
   partId: string;
   partName?: string;
   createdAt: string;
+  isActive?: boolean; // false = 비활성(퇴사 등), undefined/true = 활성
 }
 
 export type QuestionType = 'multiple' | 'short' | 'long' | 'ox';
@@ -46,6 +47,8 @@ export interface Exam {
   title: string;
   type: string;
   targetParts: string[];
+  targetStaffIds?: string[];          // 응시 대상 개별 인원 ID 목록
+  absentReasons?: Record<string, string>; // staffId → 미응시 사유
   status: ExamStatus;
   timeLimit: number;
   startDate: string;

@@ -37,6 +37,7 @@ export default function NewExam() {
     setSaving(true);
     await addExam({
       ...form,
+      targetStaffIds: [],
       status: 'draft',
       questionCount: 0,
       createdAt: new Date().toISOString(),

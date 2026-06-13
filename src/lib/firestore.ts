@@ -54,6 +54,14 @@ export async function deleteStaff(id: string) {
   return deleteDoc(doc(db, 'staff', id));
 }
 
+export async function toggleStaffActive(id: string, isActive: boolean) {
+  return updateDoc(doc(db, 'staff', id), { isActive });
+}
+
+export async function updateAbsentReason(examId: string, staffId: string, reason: string) {
+  return updateDoc(doc(db, 'exams', examId), { [`absentReasons.${staffId}`]: reason });
+}
+
 // Exams
 export async function getExams(): Promise<Exam[]> {
   const snap = await getDocs(query(collection(db, 'exams'), orderBy('createdAt', 'desc')));

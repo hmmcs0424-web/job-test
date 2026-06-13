@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { getExams, getResults, getStaffList, getParts } from '@/lib/firestore';
+import { getExams, getResults, getStaffList, getParts, updateAbsentReason } from '@/lib/firestore';
 import type { Exam, Result, Staff, Part } from '@/lib/types';
 
 /* ── 숫자 카운팅 애니메이션 ── */
@@ -97,6 +97,8 @@ export default function AdminDashboard() {
   const [detailTab, setDetailTab] = useState<'overall' | 'part' | 'staff' | 'question'>('overall');
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
+  const [absentReasonEdit, setAbsentReasonEdit] = useState<Record<string, string>>({});
+  const [savingReason, setSavingReason] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([getExams(), getResults(), getStaffList(), getParts()]).then(([e, r, s, p]) => {
@@ -180,39 +182,92 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-3 gap-5 mb-6">
 
         {/* 1. 응시 인원 카드 */}
-        <div
-          className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100"
-          style={{ opacity: mounted ? 1 : 0, transform: mounted ? 'translateY(0)' : 'translateY(16px)', transition: 'all 0.5s ease 0ms' }}>
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white shadow-md">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </div>
-            <span className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded-full">{selectedExam?.title ?? '전체'}</span>
-          </div>
-          <div className="text-4xl font-black text-blue-600 mb-1">
-            {mounted ? <AnimatedNumber value={totalCount} suffix="명" /> : '0명'}
-          </div>
-          <p className="text-gray-500 text-sm font-medium">응시 인원</p>
+        {(() => {
+          const targetIds = selectedExam?.targetStaffIds ?? [];
+          const targetCount = targetIds.length;
+          const absentIds = targetIds.filter(id => !results.find(r => r.staffId === id));
+          const attendRate = targetCount > 0 ? Math.round((totalCount / targetCount) * 100) : 0;
+          return (
+            <div
+              className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100"
+              style={{ opacity: mounted ? 1 : 0, transform: mounted ? 'translateY(0)' : 'translateY(16px)', transition: 'all 0.5s ease 0ms' }}>
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white shadow-md">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </div>
+                <span className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded-full">{selectedExam?.title ?? '전체'}</span>
+              </div>
 
-          {/* 합격/불합격 도넛 */}
-          <div className="mt-5 pt-4 border-t border-gray-100 flex items-center justify-around">
-            <DonutChart pct={passRate} label="합격률" color="#22c55e" />
-            <div className="space-y-2 text-sm">
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-emerald-500 flex-shrink-0" />
-                <span className="text-gray-500">합격</span>
-                <span className="font-bold text-gray-900 ml-auto">{passCount}명</span>
+              {/* 대상 / 응시 수치 */}
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="bg-gray-50 rounded-xl p-3 text-center">
+                  <p className="text-2xl font-black text-gray-700">
+                    {mounted ? <AnimatedNumber value={targetCount} suffix="명" /> : '0명'}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">대상 인원</p>
+                </div>
+                <div className="bg-blue-50 rounded-xl p-3 text-center">
+                  <p className="text-2xl font-black text-blue-600">
+                    {mounted ? <AnimatedNumber value={totalCount} suffix="명" /> : '0명'}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">응시 인원</p>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-red-400 flex-shrink-0" />
-                <span className="text-gray-500">불합격</span>
-                <span className="font-bold text-gray-900 ml-auto">{totalCount - passCount}명</span>
-              </div>
+
+              {/* 응시율 게이지 */}
+              {targetCount > 0 && (
+                <div className="mb-4">
+                  <div className="flex justify-between text-xs text-gray-400 mb-1">
+                    <span>응시율</span>
+                    <span className="font-bold text-blue-600">{attendRate}%</span>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                    <div className="h-2 rounded-full bg-blue-500 transition-all duration-1000"
+                      style={{ width: mounted ? `${attendRate}%` : '0%' }} />
+                  </div>
+                </div>
+              )}
+
+              {/* 미응시 인원 목록 + 사유 입력 */}
+              {absentIds.length > 0 && selectedExamId && (
+                <div className="border-t border-gray-100 pt-3">
+                  <p className="text-xs font-semibold text-gray-500 mb-2">미응시 인원 ({absentIds.length}명)</p>
+                  <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
+                    {absentIds.map(sid => {
+                      const s = staff.find(x => x.id === sid);
+                      if (!s) return null;
+                      const savedReason = selectedExam?.absentReasons?.[sid] ?? '';
+                      const editVal = absentReasonEdit[sid] ?? savedReason;
+                      return (
+                        <div key={sid} className="flex items-center gap-2">
+                          <span className="text-xs text-gray-700 font-medium w-14 flex-shrink-0 truncate">{s.name}</span>
+                          <input
+                            value={editVal}
+                            onChange={e => setAbsentReasonEdit(prev => ({ ...prev, [sid]: e.target.value }))}
+                            placeholder="미응시 사유"
+                            className="flex-1 text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-blue-400"
+                          />
+                          <button
+                            disabled={savingReason === sid}
+                            onClick={async () => {
+                              setSavingReason(sid);
+                              await updateAbsentReason(selectedExamId, sid, editVal);
+                              setSavingReason(null);
+                            }}
+                            className="text-xs text-blue-600 hover:text-blue-800 flex-shrink-0 disabled:text-gray-400">
+                            {savingReason === sid ? '...' : '저장'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-        </div>
+          );
+        })()}
 
         {/* 2. 평균 점수 카드 */}
         <div
@@ -241,18 +296,22 @@ export default function AdminDashboard() {
               <div className="h-4 rounded-full bg-gradient-to-r from-violet-500 to-purple-400 transition-all duration-1000"
                 style={{ width: mounted ? `${avgScore}%` : '0%' }} />
             </div>
-            <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
-              <div className="bg-red-50 rounded-lg p-2">
-                <p className="font-bold text-red-500">{results.filter(r => (r.totalScore / r.maxScore) * 100 < 60).length}명</p>
-                <p className="text-gray-400 mt-0.5">60점 미만</p>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-center text-xs">
+              <div className="bg-emerald-50 rounded-lg p-2">
+                <p className="font-bold text-emerald-600">{results.filter(r => r.maxScore > 0 && Math.round((r.totalScore / r.maxScore) * 100) === 100).length}명</p>
+                <p className="text-gray-400 mt-0.5">100점</p>
+              </div>
+              <div className="bg-blue-50 rounded-lg p-2">
+                <p className="font-bold text-blue-600">{results.filter(r => { const s = r.maxScore > 0 ? Math.round((r.totalScore / r.maxScore) * 100) : 0; return s >= 90 && s < 100; }).length}명</p>
+                <p className="text-gray-400 mt-0.5">90점 이상</p>
               </div>
               <div className="bg-yellow-50 rounded-lg p-2">
-                <p className="font-bold text-yellow-600">{results.filter(r => { const p = (r.totalScore / r.maxScore) * 100; return p >= 60 && p < 80; }).length}명</p>
-                <p className="text-gray-400 mt-0.5">60~79점</p>
-              </div>
-              <div className="bg-green-50 rounded-lg p-2">
-                <p className="font-bold text-green-600">{results.filter(r => (r.totalScore / r.maxScore) * 100 >= 80).length}명</p>
+                <p className="font-bold text-yellow-600">{results.filter(r => { const s = r.maxScore > 0 ? Math.round((r.totalScore / r.maxScore) * 100) : 0; return s >= 80 && s < 90; }).length}명</p>
                 <p className="text-gray-400 mt-0.5">80점 이상</p>
+              </div>
+              <div className="bg-red-50 rounded-lg p-2">
+                <p className="font-bold text-red-500">{results.filter(r => r.maxScore > 0 && Math.round((r.totalScore / r.maxScore) * 100) < 80).length}명</p>
+                <p className="text-gray-400 mt-0.5">80점 미만</p>
               </div>
             </div>
           </div>
