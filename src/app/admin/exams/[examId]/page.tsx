@@ -59,15 +59,20 @@ export default function EditExam() {
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">응시 대상 파트</label>
           <div className="flex flex-wrap gap-2">
-            <label className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border cursor-pointer text-sm ${form.targetParts.includes('all') ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 text-gray-700'}`}>
-              <input type="checkbox" checked={form.targetParts.includes('all')} onChange={() => togglePart('all')} className="sr-only" />전체
-            </label>
-            {parts.map(p => (
-              <label key={p.id} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border cursor-pointer text-sm ${form.targetParts.includes(p.id) ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 text-gray-700'}`}>
+            {[
+              { id: 'all', name: '전체' },
+              { id: 'newcomer', name: '신입' },
+              { id: 'manager', name: '관리자' },
+              { id: 'call-support', name: '콜지원파트' },
+              { id: 'complaint', name: '민원관리파트' },
+              ...parts.filter(p => !['all','newcomer','manager','call-support','complaint'].includes(p.id)),
+            ].map(p => (
+              <label key={p.id} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border cursor-pointer text-sm transition-colors ${form.targetParts.includes(p.id) ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 text-gray-700 hover:border-blue-400'}`}>
                 <input type="checkbox" checked={form.targetParts.includes(p.id)} onChange={() => togglePart(p.id)} className="sr-only" />{p.name}
               </label>
             ))}
           </div>
+          <p className="text-xs text-gray-400 mt-2">여러 파트를 동시에 선택할 수 있습니다.</p>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">제한 시간 (분)</label>

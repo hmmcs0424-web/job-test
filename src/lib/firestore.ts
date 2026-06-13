@@ -87,12 +87,20 @@ export async function deleteExam(id: string) {
   return deleteDoc(doc(db, 'exams', id));
 }
 
+export async function getActiveExams(): Promise<Exam[]> {
+  const snap = await getDocs(
+    query(collection(db, 'exams'), where('status', '==', 'active'), orderBy('createdAt', 'desc'))
+  );
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as Exam));
+}
+
 // Questions
 export async function getQuestions(examId: string): Promise<Question[]> {
   const snap = await getDocs(
-    query(collection(db, 'questions'), where('examId', '==', examId), orderBy('order'))
+    query(collection(db, 'questions'), where('examId', '==', examId))
   );
-  return snap.docs.map(d => ({ id: d.id, ...d.data() } as Question));
+  const docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Question));
+  return docs.sort((a, b) => a.order - b.order);
 }
 
 export async function addQuestion(data: Omit<Question, 'id'>) {
