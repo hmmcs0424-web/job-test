@@ -10,6 +10,7 @@ const navItems = [
   { href: '/admin/staff', label: '인원 관리', icon: '👥' },
   { href: '/admin/results', label: '결과 관리', icon: '📋' },
   { href: '/admin/settings', label: '설정', icon: '⚙️' },
+  { href: '/admin/seed', label: '테스트 데이터', icon: '🧪' },
 ];
 
 export default function AdminNav() {

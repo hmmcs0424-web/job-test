@@ -1,20 +1,34 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { auth } from '@/lib/firebase';
 import { sendPasswordResetEmail } from 'firebase/auth';
+import { getAdminConfig, setAdminConfig, getNonDraftExams } from '@/lib/firestore';
+import type { Exam } from '@/lib/types';
 
 export default function AdminSettings() {
   const [emailSent, setEmailSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
 
-  // Password change via API
   const [currentPw, setCurrentPw] = useState('');
   const [newPw, setNewPw] = useState('');
   const [confirmPw, setConfirmPw] = useState('');
   const [pwMsg, setPwMsg] = useState('');
   const [pwSaving, setPwSaving] = useState(false);
+
+  // 기본 시험 설정
+  const [exams, setExams] = useState<Exam[]>([]);
+  const [defaultExamId, setDefaultExamId] = useState('');
+  const [examSaving, setExamSaving] = useState(false);
+  const [examMsg, setExamMsg] = useState('');
+
+  useEffect(() => {
+    Promise.all([getNonDraftExams(), getAdminConfig()]).then(([exs, cfg]) => {
+      setExams(exs);
+      if (cfg?.defaultExamId) setDefaultExamId(cfg.defaultExamId);
+    });
+  }, []);
 
   async function handleSendEmail() {
     setSending(true);
@@ -61,10 +75,46 @@ export default function AdminSettings() {
     setPwSaving(false);
   }
 
+  async function handleSaveDefaultExam() {
+    setExamSaving(true);
+    setExamMsg('');
+    await setAdminConfig({ defaultExamId });
+    setExamMsg('저장되었습니다.');
+    setExamSaving(false);
+    setTimeout(() => setExamMsg(''), 2000);
+  }
+
   return (
     <div className="p-8 max-w-lg">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">설정</h1>
 
+      {/* 기본 시험 설정 */}
+      <div className="bg-white rounded-2xl shadow-sm p-6 mb-6">
+        <h2 className="font-bold text-gray-800 mb-1">기본 시험 설정</h2>
+        <p className="text-sm text-gray-500 mb-4">상담사 로그인 시 기본으로 선택될 시험을 설정합니다.</p>
+        <select
+          value={defaultExamId}
+          onChange={e => setDefaultExamId(e.target.value)}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">기본 선택 없음</option>
+          {exams.map(e => (
+            <option key={e.id} value={e.id}>
+              {e.title} ({e.status === 'active' ? '진행중' : e.status === 'closed' ? '종료' : e.status})
+            </option>
+          ))}
+        </select>
+        {examMsg && <p className="text-green-600 text-sm mb-2">{examMsg}</p>}
+        <button
+          onClick={handleSaveDefaultExam}
+          disabled={examSaving}
+          className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white py-3 rounded-lg font-semibold"
+        >
+          {examSaving ? '저장 중...' : '저장'}
+        </button>
+      </div>
+
+      {/* 비밀번호 변경 */}
       <div className="bg-white rounded-2xl shadow-sm p-6 mb-6">
         <h2 className="font-bold text-gray-800 mb-4">비밀번호 변경</h2>
         <div className="space-y-3">

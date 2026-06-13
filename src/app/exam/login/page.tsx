@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getActiveExams, findStaff, getParts } from '@/lib/firestore';
+import { getNonDraftExams, findStaff, getParts, getAdminConfig } from '@/lib/firestore';
 import { saveStaffSession } from '@/lib/session';
 import type { Exam, Part } from '@/lib/types';
 
@@ -18,9 +18,12 @@ export default function ExamLogin() {
   const [loggingIn, setLoggingIn] = useState(false);
 
   useEffect(() => {
-    Promise.all([getActiveExams(), getParts()]).then(([exams, parts]) => {
-      setExams(exams);
-      setParts(parts);
+    Promise.all([getNonDraftExams(), getParts(), getAdminConfig()]).then(([exs, pts, cfg]) => {
+      setExams(exs);
+      setParts(pts);
+      if (cfg?.defaultExamId && exs.some((e: Exam) => e.id === cfg.defaultExamId)) {
+        setSelectedExamId(cfg.defaultExamId);
+      }
       setLoading(false);
     });
   }, []);
@@ -81,6 +84,7 @@ export default function ExamLogin() {
               type="text"
               value={name}
               onChange={e => { setName(e.target.value); setError(''); }}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleLogin(); } }}
               placeholder="이름을 입력하세요"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
@@ -92,7 +96,7 @@ export default function ExamLogin() {
               type="text"
               value={employeeId}
               onChange={e => { setEmployeeId(e.target.value); setError(''); }}
-              onKeyDown={e => e.key === 'Enter' && handleLogin()}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleLogin(); } }}
               placeholder="사번을 입력하세요"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />

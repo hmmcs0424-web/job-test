@@ -106,7 +106,7 @@ export default function AdminLogin() {
             type="password"
             value={password}
             onChange={e => { setPassword(e.target.value); setError(''); }}
-            onKeyDown={e => e.key === 'Enter' && handleLogin()}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleLogin(); } }}
             placeholder="비밀번호"
             className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-500"
           />
