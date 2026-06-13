@@ -41,8 +41,10 @@ export default function ExamStart() {
       if (existing) { router.push('/exam/list'); return; }
 
       setExam(exam);
-      const shuffled = qs.map(q => ({
+      // 문항 순서 셔플 + 각 문항의 보기(options) 순서도 셔플
+      const shuffled = shuffleArray(qs).map((q, idx) => ({
         ...q,
+        _displayOrder: idx + 1,
         options: q.options ? shuffleArray(q.options) : undefined,
       }));
       setQuestions(shuffled);
@@ -172,24 +174,33 @@ export default function ExamStart() {
           <div key={q.id} className="bg-white rounded-2xl p-6 shadow-sm">
             <div className="flex items-start gap-3 mb-4">
               <span className="flex-shrink-0 w-7 h-7 bg-blue-600 text-white text-sm font-bold rounded-full flex items-center justify-center">{idx + 1}</span>
-              <p className="text-gray-900 font-medium leading-relaxed">{q.content}</p>
+              <div className="flex-1">
+                <p className="text-gray-900 font-medium leading-relaxed">{q.content}</p>
+                {q.imageUrl && (
+                  <img src={q.imageUrl} alt="문제 이미지" className="mt-3 max-w-full rounded-xl border border-gray-200" />
+                )}
+              </div>
             </div>
             <div className="ml-10">
               {q.type === 'multiple' && q.options && (
                 <div className="space-y-2">
-                  {q.options.map((opt, oi) => (
-                    <label key={oi} className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${answers[q.id] === opt ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                      <input
-                        type="radio"
-                        name={q.id}
-                        value={opt}
-                        checked={answers[q.id] === opt}
-                        onChange={() => setAnswers(prev => ({ ...prev, [q.id]: opt }))}
-                        className="text-blue-600"
-                      />
-                      <span className="text-gray-700">{opt}</span>
-                    </label>
-                  ))}
+                  {q.options.map((opt, oi) => {
+                    const selected = answers[q.id] === opt;
+                    return (
+                      <label key={oi}
+                        className={`flex items-center gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition-all
+                          ${selected ? 'border-blue-500 bg-blue-50 shadow-sm' : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'}`}>
+                        <input type="radio" name={q.id} value={opt} checked={selected}
+                          onChange={() => setAnswers(prev => ({ ...prev, [q.id]: opt }))} className="sr-only" />
+                        {/* 커스텀 라디오 원 */}
+                        <span className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all
+                          ${selected ? 'border-blue-500 bg-blue-500' : 'border-gray-300'}`}>
+                          {selected && <span className="w-2 h-2 rounded-full bg-white" />}
+                        </span>
+                        <span className={`text-sm leading-relaxed ${selected ? 'text-blue-700 font-medium' : 'text-gray-700'}`}>{opt}</span>
+                      </label>
+                    );
+                  })}
                 </div>
               )}
               {q.type === 'ox' && (
@@ -209,6 +220,15 @@ export default function ExamStart() {
                   onChange={e => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
                   placeholder="답을 입력하세요"
                   className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500"
+                />
+              )}
+              {q.type === 'long' && (
+                <textarea
+                  value={answers[q.id] ?? ''}
+                  onChange={e => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
+                  placeholder="답을 자세히 입력하세요"
+                  rows={5}
+                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 resize-none"
                 />
               )}
             </div>
