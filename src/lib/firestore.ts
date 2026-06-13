@@ -103,8 +103,13 @@ export async function getQuestions(examId: string): Promise<Question[]> {
   return docs.sort((a, b) => a.order - b.order);
 }
 
+// undefined 값을 제거하는 헬퍼 (Firestore는 undefined 불허)
+function stripUndefined<T extends object>(obj: T): T {
+  return JSON.parse(JSON.stringify(obj));
+}
+
 export async function addQuestion(data: Omit<Question, 'id'>) {
-  return addDoc(collection(db, 'questions'), data);
+  return addDoc(collection(db, 'questions'), stripUndefined(data));
 }
 
 export async function updateQuestion(id: string, data: Partial<Question>) {

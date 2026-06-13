@@ -13,7 +13,18 @@ export interface Staff {
   createdAt: string;
 }
 
-export type QuestionType = 'multiple' | 'short' | 'ox';
+export type QuestionType = 'multiple' | 'short' | 'long' | 'ox';
+
+export interface ExplanationLink {
+  label: string;
+  url: string;
+}
+
+export interface Explanation {
+  text?: string;
+  imageUrl?: string;
+  links?: ExplanationLink[];
+}
 
 export interface Question {
   id: string;
@@ -21,9 +32,11 @@ export interface Question {
   order: number;
   type: QuestionType;
   content: string;
+  imageUrl?: string;       // 문제 이미지
   options?: string[];
   answer: string;
   score: number;
+  explanation?: Explanation; // 풀이
 }
 
 export type ExamStatus = 'draft' | 'active' | 'closed';
