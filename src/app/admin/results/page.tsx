@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getResults, getExams, getQuestions, getParts, updateResult } from '@/lib/firestore';
-import type { Exam, Result, Question, Part, EditHistory, AnswerRecord } from '@/lib/types';
+import type { Exam, Result, Question, Part, EditHistory } from '@/lib/types';
 
 export default function AdminResults() {
   const [exams, setExams] = useState<Exam[]>([]);
@@ -13,7 +13,8 @@ export default function AdminResults() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
-  const [editAnswers, setEditAnswers] = useState<Record<string, string>>({});
+  // 정답/오답 override: true=정답처리, false=오답처리, undefined=원래값 유지
+  const [correctOverrides, setCorrectOverrides] = useState<Record<string, boolean>>({});
   const [editReason, setEditReason] = useState('');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
@@ -34,11 +35,24 @@ export default function AdminResults() {
     const qs = await getQuestions(result.examId);
     setQuestions(qs);
     setEditMode(false);
+    setCorrectOverrides({});
+  }
+
+  function getEffectiveIsCorrect(qId: string): boolean {
+    if (correctOverrides[qId] !== undefined) return correctOverrides[qId];
+    return selectedResult?.answers[qId]?.isCorrect ?? false;
   }
 
   async function handleSaveEdit() {
     if (!selectedResult || !editReason.trim()) {
       setMsg('수정 사유를 입력해주세요.'); return;
+    }
+    // 변경된 항목이 있는지 확인
+    const changedIds = Object.keys(correctOverrides).filter(
+      qId => correctOverrides[qId] !== selectedResult.answers[qId]?.isCorrect
+    );
+    if (changedIds.length === 0) {
+      setMsg('변경된 항목이 없습니다.'); return;
     }
     setSaving(true);
 
@@ -49,23 +63,22 @@ export default function AdminResults() {
     let maxScore = 0;
 
     for (const q of questions) {
-      const before = newAnswers[q.id];
-      const newGiven = editAnswers[q.id] ?? before?.given ?? '';
-      const isCorrect = newGiven.trim() === q.answer.trim();
+      const before = newAnswers[q.id] ?? { given: '', isCorrect: false, score: 0 };
+      const isCorrect = correctOverrides[q.id] !== undefined ? correctOverrides[q.id] : before.isCorrect;
       const score = isCorrect ? q.score : 0;
 
-      if (newGiven !== before?.given) {
+      if (correctOverrides[q.id] !== undefined && correctOverrides[q.id] !== before.isCorrect) {
         history.push({
           questionId: q.id,
-          before: before ?? { given: '', isCorrect: false, score: 0 },
-          after: { given: newGiven, isCorrect, score },
+          before,
+          after: { given: before.given, isCorrect, score },
           reason: editReason,
           editedBy: '관리자',
           editedAt: new Date().toISOString(),
         });
       }
 
-      newAnswers[q.id] = { given: newGiven, isCorrect, score };
+      newAnswers[q.id] = { given: before.given, isCorrect, score };
       totalScore += score;
       maxScore += q.score;
     }
@@ -82,6 +95,7 @@ export default function AdminResults() {
     await reload();
     setSelectedResult({ ...selectedResult, ...updated } as Result);
     setEditMode(false);
+    setCorrectOverrides({});
     setEditReason('');
     setSaving(false);
     setMsg('수정되었습니다.');
@@ -91,6 +105,11 @@ export default function AdminResults() {
   if (loading) return <div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div></div>;
 
   if (selectedResult) {
+    // 편집 모드에서 미리보기 점수 계산
+    const previewScore = editMode
+      ? questions.reduce((sum, q) => sum + (getEffectiveIsCorrect(q.id) ? q.score : 0), 0)
+      : selectedResult.totalScore;
+
     return (
       <div className="p-8">
         <button onClick={() => setSelectedResult(null)} className="text-gray-400 hover:text-gray-600 mb-6 flex items-center gap-1 text-sm">← 목록으로</button>
@@ -101,16 +120,18 @@ export default function AdminResults() {
           </div>
           <div className="flex items-center gap-3">
             <div className="text-xl font-bold text-blue-600">
-              {selectedResult.totalScore}/{selectedResult.maxScore}점
+              {editMode ? (
+                <span>{previewScore}<span className="text-base text-gray-400">/{selectedResult.maxScore}점 (적용 후)</span></span>
+              ) : (
+                <span>{selectedResult.totalScore}/{selectedResult.maxScore}점</span>
+              )}
             </div>
             {!editMode && (
               <button onClick={() => {
-                const init: Record<string, string> = {};
-                questions.forEach(q => { init[q.id] = selectedResult.answers[q.id]?.given ?? ''; });
-                setEditAnswers(init);
+                setCorrectOverrides({});
                 setEditMode(true);
               }} className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
-                답안 수정
+                정답/오답 수정
               </button>
             )}
           </div>
@@ -120,14 +141,14 @@ export default function AdminResults() {
 
         {editMode && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6">
-            <p className="text-amber-800 font-medium text-sm mb-2">⚠️ 수정 모드 — 변경된 답안은 자동으로 채점됩니다.</p>
+            <p className="text-amber-800 font-medium text-sm mb-2">⚠️ 수정 모드 — 각 문항의 정답/오답 처리를 변경하면 점수에 즉시 반영됩니다.</p>
             <div className="flex gap-2">
               <input value={editReason} onChange={e => setEditReason(e.target.value)} placeholder="수정 사유를 입력하세요 (필수)"
                 className="flex-1 border border-amber-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" />
               <button onClick={handleSaveEdit} disabled={saving} className="bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white px-4 py-2 rounded-lg text-sm font-medium">
                 {saving ? '저장 중...' : '수정 저장'}
               </button>
-              <button onClick={() => setEditMode(false)} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm">취소</button>
+              <button onClick={() => { setEditMode(false); setCorrectOverrides({}); }} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm">취소</button>
             </div>
           </div>
         )}
@@ -135,43 +156,48 @@ export default function AdminResults() {
         <div className="space-y-4 mb-6">
           {questions.map((q, idx) => {
             const a = selectedResult.answers[q.id];
+            const effectiveIsCorrect = getEffectiveIsCorrect(q.id);
+            const isOverridden = correctOverrides[q.id] !== undefined;
+
             return (
-              <div key={q.id} className={`bg-white rounded-2xl p-5 shadow-sm border-l-4 ${a?.isCorrect ? 'border-green-400' : 'border-red-400'}`}>
-                <div className="flex items-start gap-3 mb-3">
-                  <span className={`flex-shrink-0 w-6 h-6 text-xs font-bold rounded-full flex items-center justify-center ${a?.isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>{idx + 1}</span>
-                  <p className="text-gray-900 font-medium text-sm">{q.content}</p>
-                </div>
-                <div className="ml-9 space-y-2">
-                  {editMode ? (
-                    q.type === 'multiple' && q.options ? (
-                      <div className="space-y-1">
-                        {q.options.map((opt, oi) => (
-                          <label key={oi} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-sm ${editAnswers[q.id] === opt ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
-                            <input type="radio" name={`edit-${q.id}`} value={opt} checked={editAnswers[q.id] === opt}
-                              onChange={() => setEditAnswers(p => ({ ...p, [q.id]: opt }))} className="text-blue-600" />
-                            {opt}
-                          </label>
-                        ))}
+              <div key={q.id} className={`bg-white rounded-2xl p-5 shadow-sm border-l-4 ${effectiveIsCorrect ? 'border-green-400' : 'border-red-400'}`}>
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="flex items-start gap-3">
+                    <span className={`flex-shrink-0 w-6 h-6 text-xs font-bold rounded-full flex items-center justify-center ${effectiveIsCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>{idx + 1}</span>
+                    <p className="text-gray-900 font-medium text-sm">{q.content}</p>
+                  </div>
+                  {editMode && (
+                    <div className="flex-shrink-0 flex items-center gap-2">
+                      {isOverridden && (
+                        <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">변경됨</span>
+                      )}
+                      <div className="flex rounded-lg overflow-hidden border border-gray-200">
+                        <button
+                          onClick={() => setCorrectOverrides(prev => ({ ...prev, [q.id]: true }))}
+                          className={`px-3 py-1.5 text-xs font-medium transition-colors ${effectiveIsCorrect ? 'bg-green-500 text-white' : 'bg-white text-gray-500 hover:bg-green-50'}`}
+                        >
+                          정답
+                        </button>
+                        <button
+                          onClick={() => setCorrectOverrides(prev => ({ ...prev, [q.id]: false }))}
+                          className={`px-3 py-1.5 text-xs font-medium transition-colors border-l border-gray-200 ${!effectiveIsCorrect ? 'bg-red-500 text-white' : 'bg-white text-gray-500 hover:bg-red-50'}`}
+                        >
+                          오답
+                        </button>
                       </div>
-                    ) : q.type === 'ox' ? (
-                      <div className="flex gap-2">
-                        {['O', 'X'].map(v => (
-                          <label key={v} className={`flex-1 flex items-center justify-center p-2 rounded-lg border cursor-pointer font-bold ${editAnswers[q.id] === v ? 'border-blue-500 bg-blue-50 text-blue-600' : 'border-gray-200 text-gray-400'}`}>
-                            <input type="radio" value={v} checked={editAnswers[q.id] === v} onChange={() => setEditAnswers(p => ({ ...p, [q.id]: v }))} className="sr-only" />{v}
-                          </label>
-                        ))}
-                      </div>
-                    ) : (
-                      <input value={editAnswers[q.id] ?? ''} onChange={e => setEditAnswers(p => ({ ...p, [q.id]: e.target.value }))}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    )
-                  ) : (
-                    <div className="text-sm space-y-1">
-                      <span className="text-gray-400">답안: </span>
-                      <span className={a?.isCorrect ? 'text-green-600 font-medium' : 'text-red-500 font-medium'}>{a?.given || '(미응답)'}</span>
-                      {!a?.isCorrect && <> · <span className="text-gray-400">정답: </span><span className="text-gray-700">{q.answer}</span></>}
                     </div>
                   )}
+                </div>
+                <div className="ml-9 space-y-1 text-sm">
+                  <div>
+                    <span className="text-gray-400">제출 답안: </span>
+                    <span className={`font-medium ${effectiveIsCorrect ? 'text-green-600' : 'text-red-500'}`}>{a?.given || '(미응답)'}</span>
+                    <span className="ml-2 text-gray-400 text-xs">({effectiveIsCorrect ? `+${q.score}점` : '0점'})</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">정답: </span>
+                    <span className="text-gray-700">{q.answer}</span>
+                  </div>
                 </div>
               </div>
             );
@@ -191,11 +217,15 @@ export default function AdminResults() {
                       <span className="text-gray-400 text-xs">{new Date(h.editedAt).toLocaleString('ko-KR')}</span>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-gray-600">
-                      <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded">{h.before.given || '(미응답)'}</span>
+                      <span className={`px-2 py-0.5 rounded font-medium ${h.before.isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                        {h.before.isCorrect ? '정답' : '오답'} ({h.before.score}점)
+                      </span>
                       <span>→</span>
-                      <span className="bg-green-100 text-green-600 px-2 py-0.5 rounded">{h.after.given}</span>
+                      <span className={`px-2 py-0.5 rounded font-medium ${h.after.isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                        {h.after.isCorrect ? '정답' : '오답'} ({h.after.score}점)
+                      </span>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">사유: {h.reason}</p>
+                    <p className="text-xs text-gray-500 mt-1">사유: {h.reason} · {h.editedBy}</p>
                   </div>
                 );
               })}
