@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getResults, getExams, getQuestions, getParts, getStaffList, updateResult, updateAbsentReason } from '@/lib/firestore';
+import { getResults, getExams, getQuestions, getParts, getStaffList, updateResult, deleteResult, updateAbsentReason } from '@/lib/firestore';
 import type { Exam, Result, Question, Part, EditHistory, Staff } from '@/lib/types';
 
 export default function AdminResults() {
@@ -241,11 +241,11 @@ export default function AdminResults() {
     );
   }
 
-  // 선택된 시험의 미응시 인원 계산
+  // 선택된 시험
   const selectedExam = exams.find(e => e.id === selectedExamId) ?? null;
-  const submittedStaffIds = new Set(
-    filteredResults.map(r => r.staffId)
-  );
+
+  // 미응시 인원: 선택 시험의 targetStaffIds 중 결과가 없는 인원
+  const submittedStaffIds = new Set(filteredResults.map(r => r.staffId));
   const absentStaff: Staff[] = selectedExam
     ? (selectedExam.targetStaffIds ?? [])
         .map(id => allStaff.find(s => s.id === id))
@@ -257,13 +257,18 @@ export default function AdminResults() {
     const reason = absentReasonDraft[staffId] ?? '';
     setSavingAbsent(p => ({ ...p, [staffId]: true }));
     await updateAbsentReason(selectedExamId, staffId, reason);
-    // exams 로컬 상태도 업데이트
     setExams(prev => prev.map(e =>
       e.id === selectedExamId
         ? { ...e, absentReasons: { ...(e.absentReasons ?? {}), [staffId]: reason } }
         : e
     ));
     setSavingAbsent(p => ({ ...p, [staffId]: false }));
+  }
+
+  async function handleDeleteResult(r: Result) {
+    if (!confirm(`${r.staffName}의 "${r.examTitle}" 결과를 삭제하시겠습니까?\n삭제 후 복구할 수 없습니다.`)) return;
+    await deleteResult(r.id);
+    await reload();
   }
 
   return (
@@ -280,7 +285,14 @@ export default function AdminResults() {
         </select>
       </div>
 
+      {/* 응시 완료 결과 */}
       <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-6">
+        {selectedExam && (
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+            <h2 className="font-semibold text-gray-800">응시 완료</h2>
+            <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">{filteredResults.length}명</span>
+          </div>
+        )}
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
@@ -305,7 +317,10 @@ export default function AdminResults() {
                   )}
                 </td>
                 <td className="px-5 py-3">
-                  <button onClick={() => openResult(r)} className="text-blue-600 hover:text-blue-800 text-sm font-medium">상세 보기</button>
+                  <div className="flex items-center gap-3 justify-end">
+                    <button onClick={() => openResult(r)} className="text-blue-600 hover:text-blue-800 text-sm font-medium">상세 보기</button>
+                    <button onClick={() => handleDeleteResult(r)} className="text-red-500 hover:text-red-700 text-xs">삭제</button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -316,15 +331,20 @@ export default function AdminResults() {
         </table>
       </div>
 
-      {/* 미응시 인원 — 특정 시험 선택 시에만 표시 */}
+      {/* 미응시 인원 — 특정 시험 선택 시 항상 표시 (시험 전후 모두) */}
       {selectedExam && (
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
             <h2 className="font-semibold text-gray-800">미응시 인원</h2>
             <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{absentStaff.length}명</span>
+            {(selectedExam.targetStaffIds ?? []).length === 0 && (
+              <span className="text-xs text-gray-400 ml-1">— 시험 관리에서 응시 대상 인원을 설정하세요</span>
+            )}
           </div>
-          {absentStaff.length === 0 ? (
-            <p className="text-center text-gray-400 text-sm py-8">미응시 인원이 없습니다.</p>
+          {absentStaff.length === 0 && (selectedExam.targetStaffIds ?? []).length > 0 ? (
+            <p className="text-center text-gray-400 text-sm py-8">전원 응시 완료</p>
+          ) : absentStaff.length === 0 ? (
+            <p className="text-center text-gray-400 text-sm py-8">응시 대상 인원이 설정되지 않았습니다.</p>
           ) : (
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
@@ -338,7 +358,7 @@ export default function AdminResults() {
               <tbody className="divide-y divide-gray-100">
                 {absentStaff.map(s => {
                   const savedReason = selectedExam.absentReasons?.[s.id] ?? '';
-                  const draft = absentReasonDraft[s.id] ?? savedReason;
+                  const draft = absentReasonDraft[s.id] !== undefined ? absentReasonDraft[s.id] : savedReason;
                   const isDirty = draft !== savedReason;
                   return (
                     <tr key={s.id} className="hover:bg-gray-50">

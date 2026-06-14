@@ -175,6 +175,10 @@ export async function updateResult(id: string, data: Partial<Result>) {
   return updateDoc(doc(db, 'results', id), data);
 }
 
+export async function deleteResult(id: string) {
+  return deleteDoc(doc(db, 'results', id));
+}
+
 // Admin config
 export async function getAdminConfig() {
   const snap = await getDoc(doc(db, 'admin', 'config'));
