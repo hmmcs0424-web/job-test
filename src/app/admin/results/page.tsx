@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getResults, getExams, getQuestions, getParts, updateResult } from '@/lib/firestore';
-import type { Exam, Result, Question, Part, EditHistory } from '@/lib/types';
+import { getResults, getExams, getQuestions, getParts, getStaffList, updateResult, updateAbsentReason } from '@/lib/firestore';
+import type { Exam, Result, Question, Part, EditHistory, Staff } from '@/lib/types';
 
 export default function AdminResults() {
   const [exams, setExams] = useState<Exam[]>([]);
   const [parts, setParts] = useState<Part[]>([]);
+  const [allStaff, setAllStaff] = useState<Staff[]>([]);
   const [results, setResults] = useState<Result[]>([]);
   const [selectedExamId, setSelectedExamId] = useState('');
   const [selectedResult, setSelectedResult] = useState<Result | null>(null);
@@ -18,12 +19,16 @@ export default function AdminResults() {
   const [editReason, setEditReason] = useState('');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
+  // 미응시 사유 입력 상태: staffId → reason 텍스트
+  const [absentReasonDraft, setAbsentReasonDraft] = useState<Record<string, string>>({});
+  const [savingAbsent, setSavingAbsent] = useState<Record<string, boolean>>({});
 
   async function reload() {
-    const [e, r, p] = await Promise.all([getExams(), getResults(), getParts()]);
+    const [e, r, p, s] = await Promise.all([getExams(), getResults(), getParts(), getStaffList()]);
     setExams(e);
     setResults(r);
     setParts(p);
+    setAllStaff(s);
   }
 
   useEffect(() => { reload().then(() => setLoading(false)); }, []);
@@ -236,18 +241,46 @@ export default function AdminResults() {
     );
   }
 
+  // 선택된 시험의 미응시 인원 계산
+  const selectedExam = exams.find(e => e.id === selectedExamId) ?? null;
+  const submittedStaffIds = new Set(
+    filteredResults.map(r => r.staffId)
+  );
+  const absentStaff: Staff[] = selectedExam
+    ? (selectedExam.targetStaffIds ?? [])
+        .map(id => allStaff.find(s => s.id === id))
+        .filter((s): s is Staff => !!s && !submittedStaffIds.has(s.id))
+    : [];
+
+  async function handleSaveAbsentReason(staffId: string) {
+    if (!selectedExamId) return;
+    const reason = absentReasonDraft[staffId] ?? '';
+    setSavingAbsent(p => ({ ...p, [staffId]: true }));
+    await updateAbsentReason(selectedExamId, staffId, reason);
+    // exams 로컬 상태도 업데이트
+    setExams(prev => prev.map(e =>
+      e.id === selectedExamId
+        ? { ...e, absentReasons: { ...(e.absentReasons ?? {}), [staffId]: reason } }
+        : e
+    ));
+    setSavingAbsent(p => ({ ...p, [staffId]: false }));
+  }
+
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">결과 관리</h1>
-        <select value={selectedExamId} onChange={e => setSelectedExamId(e.target.value)}
+        <select value={selectedExamId} onChange={e => {
+          setSelectedExamId(e.target.value);
+          setAbsentReasonDraft({});
+        }}
           className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
           <option value="">전체 시험</option>
           {exams.map(e => <option key={e.id} value={e.id}>{e.title}</option>)}
         </select>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-6">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
@@ -282,6 +315,60 @@ export default function AdminResults() {
           </tbody>
         </table>
       </div>
+
+      {/* 미응시 인원 — 특정 시험 선택 시에만 표시 */}
+      {selectedExam && (
+        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+            <h2 className="font-semibold text-gray-800">미응시 인원</h2>
+            <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{absentStaff.length}명</span>
+          </div>
+          {absentStaff.length === 0 ? (
+            <p className="text-center text-gray-400 text-sm py-8">미응시 인원이 없습니다.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="text-left px-5 py-3 font-medium text-gray-500">이름</th>
+                  <th className="text-left px-5 py-3 font-medium text-gray-500">파트</th>
+                  <th className="text-left px-5 py-3 font-medium text-gray-500">미응시 사유</th>
+                  <th className="px-5 py-3 w-20"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {absentStaff.map(s => {
+                  const savedReason = selectedExam.absentReasons?.[s.id] ?? '';
+                  const draft = absentReasonDraft[s.id] ?? savedReason;
+                  const isDirty = draft !== savedReason;
+                  return (
+                    <tr key={s.id} className="hover:bg-gray-50">
+                      <td className="px-5 py-3 font-medium">{s.name}</td>
+                      <td className="px-5 py-3 text-gray-500">{parts.find(p => p.id === s.partId)?.name ?? '-'}</td>
+                      <td className="px-5 py-3">
+                        <input
+                          value={draft}
+                          onChange={e => setAbsentReasonDraft(p => ({ ...p, [s.id]: e.target.value }))}
+                          placeholder="미응시 사유를 입력하세요"
+                          className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </td>
+                      <td className="px-5 py-3">
+                        <button
+                          onClick={() => handleSaveAbsentReason(s.id)}
+                          disabled={!isDirty || savingAbsent[s.id]}
+                          className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-40 bg-blue-600 hover:bg-blue-700 text-white disabled:bg-blue-300"
+                        >
+                          {savingAbsent[s.id] ? '저장 중' : '저장'}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
     </div>
   );
 }
