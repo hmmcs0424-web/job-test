@@ -95,6 +95,30 @@ export async function deleteExam(id: string) {
   return deleteDoc(doc(db, 'exams', id));
 }
 
+// 시험 복사 — 문항을 포함해 그대로 복제 (기간만 다르게 재사용할 때 사용)
+export async function duplicateExam(examId: string): Promise<string> {
+  const exam = await getExam(examId);
+  if (!exam) throw new Error('시험을 찾을 수 없습니다.');
+  const questions = await getQuestions(examId);
+
+  const { id: _id, ...examData } = exam;
+  const newExamRef = await addExam(stripUndefined({
+    ...examData,
+    title: `${exam.title} (복사)`,
+    status: 'draft' as const,
+    targetStaffIds: exam.targetStaffIds ?? [],
+    absentReasons: {},
+    createdAt: new Date().toISOString(),
+  }));
+
+  await Promise.all(questions.map(q => {
+    const { id: _qId, ...qData } = q;
+    return addQuestion({ ...qData, examId: newExamRef.id });
+  }));
+
+  return newExamRef.id;
+}
+
 export async function getActiveExams(): Promise<Exam[]> {
   const snap = await getDocs(
     query(collection(db, 'exams'), where('status', '==', 'active'))

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getExams, updateExam, deleteExam, getAdminConfig, setAdminConfig } from '@/lib/firestore';
+import { getExams, updateExam, deleteExam, duplicateExam, getAdminConfig, setAdminConfig } from '@/lib/firestore';
 import type { Exam, ExamStatus } from '@/lib/types';
 
 const statusLabel: Record<ExamStatus, string> = { draft: '준비중', active: '진행중', closed: '마감' };
@@ -14,6 +14,7 @@ export default function AdminExams() {
   const [loading, setLoading] = useState(true);
   const [defaultExamId, setDefaultExamId] = useState('');
   const [settingDefault, setSettingDefault] = useState('');
+  const [duplicating, setDuplicating] = useState('');
 
   async function reload() {
     const [e, cfg] = await Promise.all([getExams(), getAdminConfig()]);
@@ -34,6 +35,15 @@ export default function AdminExams() {
     await setAdminConfig({ defaultExamId: newId });
     setDefaultExamId(newId);
     setSettingDefault('');
+  }
+
+  async function handleDuplicate(exam: Exam) {
+    if (!confirm(`"${exam.title}" 시험을 복사하시겠습니까?\n문항이 모두 포함되어 복사되며, 새 시험은 준비중 상태로 생성됩니다.`)) return;
+    setDuplicating(exam.id);
+    const newExamId = await duplicateExam(exam.id);
+    setDuplicating('');
+    await reload();
+    router.push(`/admin/exams/${newExamId}`);
   }
 
   async function handleDelete(id: string) {
@@ -116,6 +126,10 @@ export default function AdminExams() {
                     className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg">수정</button>
                   <button onClick={() => router.push(`/admin/exams/${exam.id}/questions`)}
                     className="text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg">문항 관리</button>
+                  <button onClick={() => handleDuplicate(exam)} disabled={duplicating === exam.id}
+                    className="text-sm bg-purple-50 hover:bg-purple-100 text-purple-700 disabled:opacity-50 px-3 py-1.5 rounded-lg">
+                    {duplicating === exam.id ? '복사 중...' : '복사'}
+                  </button>
                   <button onClick={() => handleDelete(exam.id)}
                     className="text-sm text-red-500 hover:text-red-700 px-2 py-1.5">삭제</button>
                 </div>

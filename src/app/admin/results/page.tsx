@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getResults, getExams, getQuestions, getParts, getStaffList, updateResult, deleteResult, updateAbsentReason } from '@/lib/firestore';
+import { downloadCsv } from '@/lib/exportCsv';
 import type { Exam, Result, Question, Part, EditHistory, Staff } from '@/lib/types';
 
 export default function AdminResults() {
@@ -271,18 +272,41 @@ export default function AdminResults() {
     await reload();
   }
 
+  function handleExportExcel() {
+    const headers = ['이름', '사번', '파트', '시험', '점수', '만점', '합격여부', '응시일시', '수정횟수'];
+    const rows = filteredResults.map(r => [
+      r.staffName,
+      r.staffEmployeeId,
+      parts.find(p => p.id === r.partId)?.name ?? '-',
+      r.examTitle,
+      r.totalScore,
+      r.maxScore,
+      r.passed ? '합격' : '불합격',
+      new Date(r.submittedAt).toLocaleString('ko-KR'),
+      r.editHistory.length,
+    ]);
+    const examName = selectedExam ? selectedExam.title.replace(/[\\/:*?"<>|]/g, '_') : '전체';
+    downloadCsv(`결과관리_${examName}_${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+  }
+
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">결과 관리</h1>
-        <select value={selectedExamId} onChange={e => {
-          setSelectedExamId(e.target.value);
-          setAbsentReasonDraft({});
-        }}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-          <option value="">전체 시험</option>
-          {exams.map(e => <option key={e.id} value={e.id}>{e.title}</option>)}
-        </select>
+        <div className="flex items-center gap-2">
+          <select value={selectedExamId} onChange={e => {
+            setSelectedExamId(e.target.value);
+            setAbsentReasonDraft({});
+          }}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="">전체 시험</option>
+            {exams.map(e => <option key={e.id} value={e.id}>{e.title}</option>)}
+          </select>
+          <button onClick={handleExportExcel} disabled={filteredResults.length === 0}
+            className="bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5">
+            엑셀 다운로드
+          </button>
+        </div>
       </div>
 
       {/* 응시 완료 결과 */}
