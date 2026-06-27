@@ -11,6 +11,9 @@ export default function AdminResults() {
   const [allStaff, setAllStaff] = useState<Staff[]>([]);
   const [results, setResults] = useState<Result[]>([]);
   const [selectedExamId, setSelectedExamId] = useState('');
+  const [selectedPartId, setSelectedPartId] = useState('');
+  const [passFilter, setPassFilter] = useState<'' | 'pass' | 'fail'>('');
+  const [searchText, setSearchText] = useState('');
   const [selectedResult, setSelectedResult] = useState<Result | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,7 +37,18 @@ export default function AdminResults() {
 
   useEffect(() => { reload().then(() => setLoading(false)); }, []);
 
-  const filteredResults = results.filter(r => !selectedExamId || r.examId === selectedExamId);
+  const filteredResults = results.filter(r => {
+    if (selectedExamId && r.examId !== selectedExamId) return false;
+    if (selectedPartId && r.partId !== selectedPartId) return false;
+    if (passFilter === 'pass' && !r.passed) return false;
+    if (passFilter === 'fail' && r.passed) return false;
+    const keyword = searchText.trim().toLowerCase();
+    if (keyword) {
+      const hit = r.staffName.toLowerCase().includes(keyword) || r.staffEmployeeId.toLowerCase().includes(keyword);
+      if (!hit) return false;
+    }
+    return true;
+  });
 
   async function openResult(result: Result) {
     setSelectedResult(result);
@@ -291,22 +305,42 @@ export default function AdminResults() {
 
   return (
     <div className="p-8">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-gray-900">결과 관리</h1>
-        <div className="flex items-center gap-2">
-          <select value={selectedExamId} onChange={e => {
-            setSelectedExamId(e.target.value);
-            setAbsentReasonDraft({});
-          }}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="">전체 시험</option>
-            {exams.map(e => <option key={e.id} value={e.id}>{e.title}</option>)}
-          </select>
-          <button onClick={handleExportExcel} disabled={filteredResults.length === 0}
-            className="bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5">
-            엑셀 다운로드
-          </button>
-        </div>
+        <button onClick={handleExportExcel} disabled={filteredResults.length === 0}
+          className="bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5">
+          엑셀 다운로드 ({filteredResults.length}건)
+        </button>
+      </div>
+
+      <div className="flex items-center gap-2 mb-6 flex-wrap">
+        <select value={selectedExamId} onChange={e => {
+          setSelectedExamId(e.target.value);
+          setAbsentReasonDraft({});
+        }}
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">전체 시험</option>
+          {exams.map(e => <option key={e.id} value={e.id}>{e.title}</option>)}
+        </select>
+        <select value={selectedPartId} onChange={e => setSelectedPartId(e.target.value)}
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">전체 파트</option>
+          {parts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+        <select value={passFilter} onChange={e => setPassFilter(e.target.value as '' | 'pass' | 'fail')}
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">합격/불합격 전체</option>
+          <option value="pass">합격만</option>
+          <option value="fail">불합격만</option>
+        </select>
+        <input value={searchText} onChange={e => setSearchText(e.target.value)}
+          placeholder="이름 또는 사번 검색"
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1 min-w-[180px]" />
+        {(selectedExamId || selectedPartId || passFilter || searchText) && (
+          <button
+            onClick={() => { setSelectedExamId(''); setSelectedPartId(''); setPassFilter(''); setSearchText(''); setAbsentReasonDraft({}); }}
+            className="text-sm text-gray-500 hover:text-gray-700 px-3 py-2">필터 초기화</button>
+        )}
       </div>
 
       {/* 응시 완료 결과 */}

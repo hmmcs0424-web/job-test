@@ -27,7 +27,6 @@ export default function EditExam() {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState('');
   const [staffTab, setStaffTab] = useState<string>(''); // 파트별 탭
 
   const isActive = (s: Staff) => s.isActive !== false;
@@ -98,9 +97,7 @@ export default function EditExam() {
       startDate: form.startDate,
       endDate: form.endDate,
     });
-    setMsg('저장되었습니다.');
-    setSaving(false);
-    setTimeout(() => setMsg(''), 2000);
+    router.push('/admin/exams');
   }
 
   if (loading) return <div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div></div>;
@@ -123,7 +120,6 @@ export default function EditExam() {
     <div className="p-8 max-w-3xl">
       <button onClick={() => router.push('/admin/exams')} className="text-gray-400 hover:text-gray-600 mb-6 flex items-center gap-1 text-sm">← 돌아가기</button>
       <h1 className="text-2xl font-bold text-gray-900 mb-6">시험 수정</h1>
-      {msg && <div className="mb-4 bg-green-50 text-green-700 rounded-lg px-4 py-2 text-sm">{msg}</div>}
 
       <div className="space-y-5">
         {/* 기본 정보 */}
