@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { getExam, getQuestions, getResultByExamAndStaff } from '@/lib/firestore';
 import { getStaffSession } from '@/lib/session';
 import { formatAnswerDisplay } from '@/lib/answer';
+import { isResultStillVisible } from '@/lib/examVisibility';
 import type { Exam, Question, Result } from '@/lib/types';
 
 /* ── 라이트박스 ── */
@@ -48,6 +49,7 @@ export default function ExamResult() {
       .then(([exam, qs, result]) => {
         if (!exam || !result) { router.push('/exam/list'); return; }
         if (exam.status !== 'closed') { router.push('/exam/list'); return; }
+        if (!isResultStillVisible(exam)) { router.push('/exam/list'); return; }
         setExam(exam); setQuestions(qs); setResult(result); setLoading(false);
       });
   }, [examId]);

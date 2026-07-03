@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getVisibleExamsForPart, getResultByExamAndStaff } from '@/lib/firestore';
 import { getStaffSession, clearStaffSession } from '@/lib/session';
+import { isResultStillVisible } from '@/lib/examVisibility';
 import type { Exam } from '@/lib/types';
 
 export default function ExamList() {
@@ -21,8 +22,8 @@ export default function ExamList() {
         allExams.map(e => getResultByExamAndStaff(e.id, staff.id))
       );
       const ids = new Set(submitted.flatMap((r, i) => r ? [allExams[i].id] : []));
-      // 마감된 시험은 제출 이력이 있는 경우에만 노출 (결과보기 목적)
-      const visible = allExams.filter(e => e.status === 'active' || ids.has(e.id));
+      // 마감된 시험은 제출 이력이 있고, 관리자가 설정한 결과 노출 기간 내인 경우에만 노출 (결과보기 목적)
+      const visible = allExams.filter(e => e.status === 'active' || (ids.has(e.id) && isResultStillVisible(e)));
       setExams(visible);
       setSubmittedExamIds(ids);
       setLoading(false);

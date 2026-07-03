@@ -25,7 +25,13 @@ export default function AdminExams() {
   useEffect(() => { reload().then(() => setLoading(false)); }, []);
 
   async function handleStatusChange(id: string, status: ExamStatus) {
-    await updateExam(id, { status });
+    // 마감 상태를 벗어나면 노출 종료일은 더 이상 의미가 없으므로 초기화
+    await updateExam(id, { status, ...(status !== 'closed' ? { resultVisibleUntil: '' } : {}) });
+    await reload();
+  }
+
+  async function handleSetVisibleUntil(id: string, date: string) {
+    await updateExam(id, { resultVisibleUntil: date });
     await reload();
   }
 
@@ -122,6 +128,17 @@ export default function AdminExams() {
                     <option value="active">진행중</option>
                     <option value="closed">마감</option>
                   </select>
+                  {exam.status === 'closed' && (
+                    <div className="flex items-center gap-1.5" title="설정하지 않으면 상담사에게 결과가 무기한 노출됩니다">
+                      <span className="text-xs text-gray-400 whitespace-nowrap">결과 노출 종료일</span>
+                      <input
+                        type="date"
+                        value={exam.resultVisibleUntil ?? ''}
+                        onChange={e => handleSetVisibleUntil(exam.id, e.target.value)}
+                        className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  )}
                   <button onClick={() => router.push(`/admin/exams/${exam.id}`)}
                     className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg">수정</button>
                   <button onClick={() => router.push(`/admin/exams/${exam.id}/questions`)}

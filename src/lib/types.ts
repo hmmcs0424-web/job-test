@@ -55,6 +55,7 @@ export interface Exam {
   endDate: string;
   questionCount: number;
   createdAt: string;
+  resultVisibleUntil?: string; // 마감 후 상담사에게 결과를 노출하는 종료일(YYYY-MM-DD). 미설정 시 무기한 노출.
 }
 
 export interface AnswerRecord {

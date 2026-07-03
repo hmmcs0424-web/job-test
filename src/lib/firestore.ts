@@ -109,6 +109,7 @@ export async function duplicateExam(examId: string): Promise<string> {
     status: 'draft' as const,
     targetStaffIds: exam.targetStaffIds ?? [],
     absentReasons: {},
+    resultVisibleUntil: '',
     createdAt: new Date().toISOString(),
   }));
 
