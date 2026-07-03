@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getActiveExamsForPart, getResultByExamAndStaff } from '@/lib/firestore';
+import { getVisibleExamsForPart, getResultByExamAndStaff } from '@/lib/firestore';
 import { getStaffSession, clearStaffSession } from '@/lib/session';
 import type { Exam } from '@/lib/types';
 
@@ -16,12 +16,14 @@ export default function ExamList() {
   useEffect(() => {
     if (!staff) { router.push('/exam/login'); return; }
 
-    getActiveExamsForPart(staff.partId).then(async exams => {
-      setExams(exams);
+    getVisibleExamsForPart(staff.partId).then(async allExams => {
       const submitted = await Promise.all(
-        exams.map(e => getResultByExamAndStaff(e.id, staff.id))
+        allExams.map(e => getResultByExamAndStaff(e.id, staff.id))
       );
-      const ids = new Set(submitted.flatMap((r, i) => r ? [exams[i].id] : []));
+      const ids = new Set(submitted.flatMap((r, i) => r ? [allExams[i].id] : []));
+      // 마감된 시험은 제출 이력이 있는 경우에만 노출 (결과보기 목적)
+      const visible = allExams.filter(e => e.status === 'active' || ids.has(e.id));
+      setExams(visible);
       setSubmittedExamIds(ids);
       setLoading(false);
     });

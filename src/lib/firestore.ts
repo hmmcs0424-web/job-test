@@ -74,12 +74,13 @@ export async function getExam(id: string): Promise<Exam | null> {
   return { id: snap.id, ...snap.data() } as Exam;
 }
 
-export async function getActiveExamsForPart(partId: string): Promise<Exam[]> {
-  const snap = await getDocs(
-    query(collection(db, 'exams'), where('status', '==', 'active'))
-  );
+// 상담사 시험 목록용 — draft를 제외한 시험(진행중 + 마감)을 모두 반환.
+// 마감된 시험도 포함해야 응시자가 마감 후 재접속 시 결과보기에 접근할 수 있다.
+export async function getVisibleExamsForPart(partId: string): Promise<Exam[]> {
+  const snap = await getDocs(collection(db, 'exams'));
   return snap.docs
     .map(d => ({ id: d.id, ...d.data() } as Exam))
+    .filter(e => e.status !== 'draft')
     .filter(e => e.targetParts.includes(partId) || e.targetParts.includes('all'));
 }
 

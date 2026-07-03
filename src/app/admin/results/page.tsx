@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { getResults, getExams, getQuestions, getParts, getStaffList, updateResult, deleteResult, updateAbsentReason } from '@/lib/firestore';
 import { downloadCsv } from '@/lib/exportCsv';
+import { formatAnswerDisplay } from '@/lib/answer';
 import type { Exam, Result, Question, Part, EditHistory, Staff } from '@/lib/types';
 
 export default function AdminResults() {
@@ -208,12 +209,12 @@ export default function AdminResults() {
                 <div className="ml-9 space-y-1 text-sm">
                   <div>
                     <span className="text-gray-400">제출 답안: </span>
-                    <span className={`font-medium ${effectiveIsCorrect ? 'text-green-600' : 'text-red-500'}`}>{a?.given || '(미응답)'}</span>
+                    <span className={`font-medium ${effectiveIsCorrect ? 'text-green-600' : 'text-red-500'}`}>{a?.given ? formatAnswerDisplay(a.given) : '(미응답)'}</span>
                     <span className="ml-2 text-gray-400 text-xs">({effectiveIsCorrect ? `+${q.score}점` : '0점'})</span>
                   </div>
                   <div>
                     <span className="text-gray-400">정답: </span>
-                    <span className="text-gray-700">{q.answer}</span>
+                    <span className="text-gray-700">{formatAnswerDisplay(q.answer)}</span>
                   </div>
                 </div>
               </div>

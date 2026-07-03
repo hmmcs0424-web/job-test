@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { getExam, getQuestions, getResultByExamAndStaff } from '@/lib/firestore';
 import { getStaffSession } from '@/lib/session';
+import { formatAnswerDisplay } from '@/lib/answer';
 import type { Exam, Question, Result } from '@/lib/types';
 
 /* ── 라이트박스 ── */
@@ -107,11 +108,11 @@ export default function ExamResult() {
                 <div className="ml-9 space-y-1 text-sm">
                   <p>
                     <span className="text-gray-400">내 답: </span>
-                    <span className={a?.isCorrect ? 'text-green-600 font-semibold' : 'text-red-500 font-semibold'}>{a?.given || '(미응답)'}</span>
+                    <span className={a?.isCorrect ? 'text-green-600 font-semibold' : 'text-red-500 font-semibold'}>{a?.given ? formatAnswerDisplay(a.given) : '(미응답)'}</span>
                     {a?.isCorrect && <span className="ml-1 text-green-500">✓</span>}
                   </p>
                   {!a?.isCorrect && (
-                    <p><span className="text-gray-400">정답: </span><span className="text-gray-800 font-semibold">{q.answer}</span></p>
+                    <p><span className="text-gray-400">정답: </span><span className="text-gray-800 font-semibold">{formatAnswerDisplay(q.answer)}</span></p>
                   )}
                 </div>
 

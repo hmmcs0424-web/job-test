@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { getExam, getQuestions, addResult, getResultByExamAndStaff } from '@/lib/firestore';
 import { getStaffSession } from '@/lib/session';
+import { splitAnswer, joinAnswer, isAnswerCorrect } from '@/lib/answer';
 import type { Exam, Question } from '@/lib/types';
 
 function shuffleArray<T>(arr: T[]): T[] {
@@ -74,7 +75,7 @@ export default function ExamStart() {
 
     for (const q of questions) {
       const given = answers[q.id] ?? '';
-      const correct = given.trim() === q.answer.trim();
+      const correct = isAnswerCorrect(given, q.answer);
       const score = correct ? q.score : 0;
       answerRecords[q.id] = { given, isCorrect: correct, score };
       total += score;
@@ -184,18 +185,27 @@ export default function ExamStart() {
             <div className="ml-10">
               {q.type === 'multiple' && q.options && (
                 <div className="space-y-2">
+                  <p className="text-xs text-gray-400 mb-1">※ 정답이 여러 개일 수 있습니다. 해당하는 보기를 모두 선택하세요.</p>
                   {q.options.map((opt, oi) => {
-                    const selected = answers[q.id] === opt;
+                    const selectedList = splitAnswer(answers[q.id] ?? '');
+                    const selected = selectedList.includes(opt);
                     return (
                       <label key={oi}
                         className={`flex items-center gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition-all
                           ${selected ? 'border-blue-500 bg-blue-50 shadow-sm' : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'}`}>
-                        <input type="radio" name={q.id} value={opt} checked={selected}
-                          onChange={() => setAnswers(prev => ({ ...prev, [q.id]: opt }))} className="sr-only" />
-                        {/* 커스텀 라디오 원 */}
-                        <span className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all
+                        <input type="checkbox" name={q.id} value={opt} checked={selected}
+                          onChange={() => {
+                            const next = selected ? selectedList.filter(o => o !== opt) : [...selectedList, opt];
+                            setAnswers(prev => ({ ...prev, [q.id]: joinAnswer(next) }));
+                          }} className="sr-only" />
+                        {/* 커스텀 체크박스 */}
+                        <span className={`flex-shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all
                           ${selected ? 'border-blue-500 bg-blue-500' : 'border-gray-300'}`}>
-                          {selected && <span className="w-2 h-2 rounded-full bg-white" />}
+                          {selected && (
+                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
                         </span>
                         <span className={`text-sm leading-relaxed ${selected ? 'text-blue-700 font-medium' : 'text-gray-700'}`}>{opt}</span>
                       </label>

@@ -1,4 +1,5 @@
 import type { Question, QuestionType, Explanation, ExplanationLink } from './types';
+import { joinAnswer } from './answer';
 
 /**
  * 일괄 등록 형식:
@@ -95,6 +96,12 @@ export function parseQuestionsText(text: string, examId: string): Omit<Question,
       answerLine = answerLine.toUpperCase();
     } else {
       type = 'short';
+    }
+
+    // 객관식 복수 정답 지원: "정답 : 보기1, 보기2"처럼 콤마로 구분된 정답을 내부 구분자로 변환
+    if (type === 'multiple') {
+      const parts = answerLine.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+      answerLine = joinAnswer(parts);
     }
 
     // 풀이 구성

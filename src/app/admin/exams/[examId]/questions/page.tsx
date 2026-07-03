@@ -8,6 +8,7 @@ import {
 } from '@/lib/firestore';
 import { parseQuestionsText } from '@/lib/parseQuestions';
 import { uploadQuestionImage } from '@/lib/uploadImage';
+import { splitAnswer, joinAnswer, formatAnswerDisplay } from '@/lib/answer';
 import type { Exam, Question, QuestionType, Explanation, ExplanationLink } from '@/lib/types';
 
 const TYPE_LABELS: Record<QuestionType, string> = {
@@ -178,8 +179,13 @@ export default function QuestionManage() {
   const addOpt = () => setForm(p => ({ ...p, options: [...p.options, ''] }));
   const delOpt = (i: number) => setForm(p => ({
     ...p, options: p.options.filter((_, idx) => idx !== i),
-    answer: p.answer === p.options[i] ? '' : p.answer,
+    answer: joinAnswer(splitAnswer(p.answer).filter(a => a !== p.options[i])),
   }));
+  const toggleAnswer = (opt: string) => setForm(p => {
+    const current = splitAnswer(p.answer);
+    const next = current.includes(opt) ? current.filter(a => a !== opt) : [...current, opt];
+    return { ...p, answer: joinAnswer(next) };
+  });
 
   /* ── 링크 관리 ── */
   const addLink = () => setForm(p => ({ ...p, expLinks: [...p.expLinks, { label: '', url: '' }] }));
@@ -389,7 +395,7 @@ export default function QuestionManage() {
                           {q.explanation && <span className="text-xs text-amber-500">💡</span>}
                         </div>
                         <p className="text-xs text-gray-700 leading-relaxed line-clamp-2">{q.content}</p>
-                        <p className="text-xs text-green-600 mt-0.5 truncate">정답: {q.answer}</p>
+                        <p className="text-xs text-green-600 mt-0.5 truncate">정답: {formatAnswerDisplay(q.answer)}</p>
                       </div>
 
                       {/* 버튼 */}
@@ -480,19 +486,26 @@ export default function QuestionManage() {
                       + 보기 추가
                     </button>
                     <div className="mt-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
-                      <p className="text-sm font-semibold text-gray-700 mb-2">정답 선택 *</p>
+                      <p className="text-sm font-semibold text-gray-700 mb-2">정답 선택 * <span className="text-xs font-normal text-gray-400">(복수 선택 가능)</span></p>
                       <div className="flex flex-wrap gap-2">
-                        {form.options.filter(o => o.trim()).map((opt, i) => (
-                          <button key={i} type="button" onClick={() => setForm(p => ({ ...p, answer: opt }))}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm border-2 transition-all
-                              ${form.answer === opt ? 'border-green-500 bg-green-50 text-green-700 font-semibold' : 'border-gray-200 text-gray-600 hover:border-green-300'}`}>
-                            <span className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center
-                              ${form.answer === opt ? 'border-green-500 bg-green-500' : 'border-gray-400'}`}>
-                              {form.answer === opt && <span className="w-2 h-2 rounded-full bg-white" />}
-                            </span>
-                            {opt}
-                          </button>
-                        ))}
+                        {form.options.filter(o => o.trim()).map((opt, i) => {
+                          const checked = splitAnswer(form.answer).includes(opt);
+                          return (
+                            <button key={i} type="button" onClick={() => toggleAnswer(opt)}
+                              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm border-2 transition-all
+                                ${checked ? 'border-green-500 bg-green-50 text-green-700 font-semibold' : 'border-gray-200 text-gray-600 hover:border-green-300'}`}>
+                              <span className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center
+                                ${checked ? 'border-green-500 bg-green-500' : 'border-gray-400'}`}>
+                                {checked && (
+                                  <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                )}
+                              </span>
+                              {opt}
+                            </button>
+                          );
+                        })}
                         {!form.options.filter(o => o.trim()).length && (
                           <p className="text-xs text-gray-400">보기를 입력하면 클릭으로 정답을 선택할 수 있습니다.</p>
                         )}
@@ -648,6 +661,7 @@ export default function QuestionManage() {
                 </div>
                 <div className="bg-blue-100 rounded-xl p-3 space-y-1 text-blue-700">
                   <p>⚠️ 객관식 정답은 번호 없이 <strong>보기 텍스트 그대로</strong></p>
+                  <p>⚠️ 정답이 여러 개인 경우 <strong>콤마(,)로 구분</strong> (예: 정답 : 보기1, 보기3)</p>
                   <p>⚠️ 등록 후 왼쪽 목록에서 확인 · 문항 관리에서 수정 가능</p>
                 </div>
               </div>
