@@ -179,7 +179,7 @@ export default function QuestionManage() {
   const addOpt = () => setForm(p => ({ ...p, options: [...p.options, ''] }));
   const delOpt = (i: number) => setForm(p => ({
     ...p, options: p.options.filter((_, idx) => idx !== i),
-    answer: joinAnswer(splitAnswer(p.answer).filter(a => a !== p.options[i])),
+    answer: joinAnswer(splitAnswer(p.answer).filter(a => a !== p.options[i].trim())),
   }));
   const toggleAnswer = (opt: string) => setForm(p => {
     const current = splitAnswer(p.answer);
@@ -219,7 +219,7 @@ export default function QuestionManage() {
       answer: form.answer.trim(),
       score: form.score,
       ...(form.imageUrl ? { imageUrl: form.imageUrl } : {}),
-      ...(form.type === 'multiple' ? { options: form.options.filter(o => o.trim()) } : {}),
+      ...(form.type === 'multiple' ? { options: form.options.map(o => o.trim()).filter(Boolean) } : {}),
       ...(explanation ? { explanation } : {}),
     };
 
@@ -488,7 +488,8 @@ export default function QuestionManage() {
                     <div className="mt-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
                       <p className="text-sm font-semibold text-gray-700 mb-2">정답 선택 * <span className="text-xs font-normal text-gray-400">(복수 선택 가능)</span></p>
                       <div className="flex flex-wrap gap-2">
-                        {form.options.filter(o => o.trim()).map((opt, i) => {
+                        {form.options.filter(o => o.trim()).map((rawOpt, i) => {
+                          const opt = rawOpt.trim();
                           const checked = splitAnswer(form.answer).includes(opt);
                           return (
                             <button key={i} type="button" onClick={() => toggleAnswer(opt)}

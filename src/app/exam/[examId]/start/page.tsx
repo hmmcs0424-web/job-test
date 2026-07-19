@@ -186,7 +186,8 @@ export default function ExamStart() {
               {q.type === 'multiple' && q.options && (
                 <div className="space-y-2">
                   <p className="text-xs text-gray-400 mb-1">※ 정답이 여러 개일 수 있습니다. 해당하는 보기를 모두 선택하세요.</p>
-                  {q.options.map((opt, oi) => {
+                  {q.options.map((rawOpt, oi) => {
+                    const opt = rawOpt.trim();
                     const selectedList = splitAnswer(answers[q.id] ?? '');
                     const selected = selectedList.includes(opt);
                     return (
